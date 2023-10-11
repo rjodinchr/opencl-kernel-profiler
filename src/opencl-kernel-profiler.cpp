@@ -79,8 +79,8 @@ static cl_program clkp_clCreateProgramWithSource(
     TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateProgramWithSource", "program", perfetto::DynamicString(program_str),
         "count", count);
     cl_program program = tdispatch->clCreateProgramWithSource(context, count, strings, lengths, errcode_ret);
+    program_to_string[program] = program_str;
     for (unsigned i = 0; i < count; i++) {
-        program_to_string[program] = program_str;
         TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY, "clCreateProgramWithSource-args", "program",
             perfetto::DynamicString(program_str), "string", perfetto::DynamicString(strings[i]));
     }
