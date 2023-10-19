@@ -201,7 +201,12 @@ static cl_command_queue clkp_clCreateCommandQueue(
 {
     TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateCommandQueue", "properties", properties);
     properties |= CL_QUEUE_PROFILING_ENABLE;
-    return tdispatch->clCreateCommandQueue(context, device, properties, errcode_ret);
+    auto queue = tdispatch->clCreateCommandQueue(context, device, properties, errcode_ret);
+
+    TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY,
+        perfetto::DynamicString("clkp-queue_" + std::to_string((uintptr_t)queue)), perfetto::Track((uintptr_t)queue));
+
+    return queue;
 }
 
 static cl_command_queue clkp_clCreateCommandQueueWithProperties(
@@ -232,7 +237,12 @@ static cl_command_queue clkp_clCreateCommandQueueWithProperties(
     }
     properties_array.push_back(0);
 
-    return tdispatch->clCreateCommandQueueWithProperties(context, device, properties_array.data(), errcode_ret);
+    auto queue = tdispatch->clCreateCommandQueueWithProperties(context, device, properties_array.data(), errcode_ret);
+
+    TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY,
+        perfetto::DynamicString("clkp-queue_" + std::to_string((uintptr_t)queue)), perfetto::Track((uintptr_t)queue));
+
+    return queue;
 }
 
 /*****************************************************************************/
