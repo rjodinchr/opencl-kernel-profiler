@@ -110,6 +110,7 @@ static cl_kernel clkp_clCreateKernel(cl_program program, const char *kernel_name
 /*****************************************************************************/
 
 struct callback_data {
+    cl_command_queue queue;
     cl_kernel kernel;
     size_t gidX, gidY, gidZ;
 };
@@ -130,12 +131,12 @@ static void callback(cl_event event, cl_int event_command_exec_status, void *use
     std::string name = kernel_to_string[data->kernel] + "-" + kernel_to_kernel_name[data->kernel] + "-"
         + std::to_string(data->gidX) + "." + std::to_string(data->gidY) + "." + std::to_string(data->gidZ);
 
-    TRACE_EVENT_BEGIN(CLKP_PERFETTO_CATEGORY, perfetto::DynamicString(name), (uint64_t)start, "program",
-        perfetto::DynamicString(program_to_string[kernel_to_program[data->kernel]]), "kernel",
-        perfetto::DynamicString(kernel_to_string[data->kernel]), "kernel_name",
+    TRACE_EVENT_BEGIN(CLKP_PERFETTO_CATEGORY, perfetto::DynamicString(name), perfetto::Track((uintptr_t)data->queue),
+        (uint64_t)start, "program", perfetto::DynamicString(program_to_string[kernel_to_program[data->kernel]]),
+        "kernel", perfetto::DynamicString(kernel_to_string[data->kernel]), "kernel_name",
         perfetto::DynamicString(kernel_to_kernel_name[data->kernel]), "gidX", data->gidX, "gidY", data->gidY, "gidZ",
         data->gidZ);
-    TRACE_EVENT_END(CLKP_PERFETTO_CATEGORY, (uint64_t)end);
+    TRACE_EVENT_END(CLKP_PERFETTO_CATEGORY, perfetto::Track((uintptr_t)data->queue), (uint64_t)end);
 
     free(data);
 }
@@ -178,6 +179,7 @@ static cl_int clkp_clEnqueueNDRangeKernel(cl_command_queue command_queue, cl_ker
 
     data = (struct callback_data *)malloc(sizeof(struct callback_data));
     CHECK_ALLOC(data, clean(); return err);
+    data->queue = command_queue;
     data->kernel = kernel;
     data->gidX = gidX;
     data->gidY = gidY;
