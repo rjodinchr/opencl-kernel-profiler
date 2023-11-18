@@ -129,7 +129,7 @@ static void callback(cl_event event, cl_int event_command_exec_status, void *use
         track_named.insert(data->queue);
         TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY,
             perfetto::DynamicString("clkp-queue_" + std::to_string((uintptr_t)data->queue)),
-            perfetto::Track((uintptr_t)data->queue), (uint64_t)start - 1);
+            perfetto::Track((uintptr_t)data->queue), (uint64_t)start - 1000);
     }
 
     std::string name = program_to_string[kernel_to_program[data->kernel]] + "-" + kernel_to_kernel_name[data->kernel]
