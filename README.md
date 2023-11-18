@@ -1,44 +1,44 @@
-# OpenCL Kernel Compiler
+# OpenCL Kernel Profiler
 
-`opencl-kernel-compiler` is a perfetto-based OpenCL kernel profiler using the layering capability of the [OpenCL-ICD-Loader](https://github.com/KhronosGroup/OpenCL-ICD-Loader#about-layers)
+`opencl-kernel-profiler` is a perfetto-based OpenCL kernel profiler using the layering capability of the [OpenCL-ICD-Loader](https://github.com/KhronosGroup/OpenCL-ICD-Loader#about-layers)
 
 # Legal
 
-`opencl-kernel-compiler` is licensed under the terms of the [Apache 2.0 license](LICENSE).
+`opencl-kernel-profiler` is licensed under the terms of the [Apache 2.0 license](LICENSE).
 
 # Dependencies
 
-`opencl-kernel-compiler` depends on the following:
+`opencl-kernel-profiler` depends on the following:
 
 * [OpenCL-ICD-Loader](https://github.com/KhronosGroup/OpenCL-ICD-Loader)
 * [OpenCL-Headers](https://github.com/KhronosGroup/OpenCL-Headers)
 * [perfetto](https://github.com/google/perfetto)
 
-`opencl-kernel-compiler` also (obviously) depends on a OpenCL implementation.
+`opencl-kernel-profiler` also (obviously) depends on a OpenCL implementation.
 
 # Building
 
-`opencl-kernel-compiler` uses CMake for its build system.
+`opencl-kernel-profiler` uses CMake for its build system.
 
 To compile it, please run:
 ```
-cmake -B <build_dir> -S <path-to-opencl-kernel-compiler> -DOPENCL_HEADER_PATH=<path-to-opencl-header> -DPERFETTO_SDK_PATH<path-to-perfetto-sdk>
+cmake -B <build_dir> -S <path-to-opencl-kernel-profiler> -DOPENCL_HEADER_PATH=<path-to-opencl-header> -DPERFETTO_SDK_PATH<path-to-perfetto-sdk>
 cmake --build <build_dir>
 ```
 
 # Build options
 
 * `OPENCL_HEADER_PATH` (REQUIRED): path to [OpenCL-Headers](https://github.com/KhronosGroup/OpenCL-Headers).
-* `PERFETTO_SDK_PATH` (REQUIRED): path to [perfetto](https://github.com/google/perfetto) sdk (`opencl-kernel-compiler` is looking for `PERFETTO_SDK_PATH/perfetto.cc` and `PERFETTO_SDK_PATH/perfetto.h`).
+* `PERFETTO_SDK_PATH` (REQUIRED): path to [perfetto](https://github.com/google/perfetto) sdk (`opencl-kernel-profiler` is looking for `PERFETTO_SDK_PATH/perfetto.cc` and `PERFETTO_SDK_PATH/perfetto.h`).
 * `BACKEND`: [perfetto](https://github.com/google/perfetto) backend to use
   * `InProcess` (default): the application will generate the traces ([perfetto documentation](https://perfetto.dev/docs/instrumentation/tracing-sdk#in-process-mode)). Build options and environment variables can be used to control the maximum size of traces and the destination file where the traces will be recorded.
   * `System`: perfetto `traced` daemon will be responsible for generating the traces ([perfetto documentation](https://perfetto.dev/docs/instrumentation/tracing-sdk#system-mode)).
 * `TRACE_MAX_SIZE` (only with `InProcess` backend): Maximum size (in KB) of traces that can be recorded. Can be overriden at runtime using the following environment variable: `CLKP_TRACE_MAX_SIZE` (Default: `1024`).
 * `TRACE_DEST` (only with `InProcess` backend): File where the traces will be recorded. Can be overriden at runtime using the following environment variable: `CLKP_TRACE_DEST` (Default: `opencl-kernel-profiler.trace`).
 
-# Running with OpenCL Kernel Compiler
+# Running with OpenCL Kernel Profiler
 
-To run an application with the `opencl-kernel-compiler`, one need to ensure the following point
+To run an application with the `opencl-kernel-profiler`, one need to ensure the following point
 
 * The application will link with the [OpenCL-ICD-Loader](https://github.com/KhronosGroup/OpenCL-ICD-Loader). If not the case, one can override `LD_LIBRARY_PATH` to point to where the `libOpenCL.so` coming from the ICD Loader is.
 * The ICD Loader is build with [layers enable](https://github.com/KhronosGroup/OpenCL-ICD-Loader#about-layers) (`ENABLE_OPENCL_LAYERS=ON`).
