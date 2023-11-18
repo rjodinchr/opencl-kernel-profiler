@@ -125,13 +125,6 @@ static void callback(cl_event event, cl_int event_command_exec_status, void *use
     CHECK_CL(err, free(data); return, "clGetEventProfilingInfo(CL_PROFILING_COMMAND_END) failed (%i)", err);
     assert(end > start);
 
-    if (track_named.count(data->queue) == 0) {
-        track_named.insert(data->queue);
-        TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY,
-            perfetto::DynamicString("clkp-queue_" + std::to_string((uintptr_t)data->queue)),
-            perfetto::Track((uintptr_t)data->queue), (uint64_t)start - 1000);
-    }
-
     std::string name = program_to_string[kernel_to_program[data->kernel]] + "-" + kernel_to_kernel_name[data->kernel]
         + "-" + std::to_string(data->gidX) + "." + std::to_string(data->gidY) + "." + std::to_string(data->gidZ);
 
@@ -159,6 +152,13 @@ static cl_int clkp_clEnqueueNDRangeKernel(cl_command_queue command_queue, cl_ker
     if (event_is_null) {
         event = (cl_event *)malloc(sizeof(cl_event));
         CHECK_ALLOC(event, return CL_OUT_OF_HOST_MEMORY);
+    }
+
+    if (track_named.count(command_queue) == 0) {
+        track_named.insert(command_queue);
+        TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY,
+            perfetto::DynamicString("clkp-queue_" + std::to_string((uintptr_t)command_queue)),
+            perfetto::Track((uintptr_t)command_queue));
     }
 
     cl_int err = tdispatch->clEnqueueNDRangeKernel(command_queue, kernel, work_dim, global_work_offset,
@@ -203,9 +203,7 @@ static cl_command_queue clkp_clCreateCommandQueue(
 {
     TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateCommandQueue", "properties", properties);
     properties |= CL_QUEUE_PROFILING_ENABLE;
-    auto queue = tdispatch->clCreateCommandQueue(context, device, properties, errcode_ret);
-
-    return queue;
+    return tdispatch->clCreateCommandQueue(context, device, properties, errcode_ret);
 }
 
 static cl_command_queue clkp_clCreateCommandQueueWithProperties(
@@ -236,9 +234,7 @@ static cl_command_queue clkp_clCreateCommandQueueWithProperties(
     }
     properties_array.push_back(0);
 
-    auto queue = tdispatch->clCreateCommandQueueWithProperties(context, device, properties_array.data(), errcode_ret);
-
-    return queue;
+    return tdispatch->clCreateCommandQueueWithProperties(context, device, properties_array.data(), errcode_ret);
 }
 
 /*****************************************************************************/
