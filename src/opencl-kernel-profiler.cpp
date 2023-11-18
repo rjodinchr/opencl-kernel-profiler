@@ -20,6 +20,7 @@
 #include <map>
 #include <mutex>
 #include <perfetto.h>
+#include <set>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -88,18 +89,12 @@ static cl_program clkp_clCreateProgramWithSource(
 }
 
 static uint32_t kernel_number = 0;
-static std::map<cl_kernel, std::string> kernel_to_string;
 static std::map<cl_kernel, std::string> kernel_to_kernel_name;
 static std::map<cl_kernel, cl_program> kernel_to_program;
 static cl_kernel clkp_clCreateKernel(cl_program program, const char *kernel_name, cl_int *errcode_ret)
 {
     std::lock_guard<std::mutex> lock(g_lock);
-    std::string kernel_str = std::string("clkp_k") + std::to_string(kernel_number++);
-    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateKernel", "program",
-        perfetto::DynamicString(program_to_string[program]), "kernel", perfetto::DynamicString(kernel_str),
-        "kernel_name", perfetto::DynamicString(kernel_name));
     cl_kernel kernel = tdispatch->clCreateKernel(program, kernel_name, errcode_ret);
-    kernel_to_string[kernel] = kernel_str;
     kernel_to_program[kernel] = program;
     kernel_to_kernel_name[kernel] = std::string(kernel_name);
     return kernel;
@@ -115,11 +110,20 @@ struct callback_data {
     size_t gidX, gidY, gidZ;
 };
 
+std::set<cl_command_queue> track_named;
 static void callback(cl_event event, cl_int event_command_exec_status, void *user_data)
 {
     struct callback_data *data = (struct callback_data *)user_data;
     assert(data != nullptr);
     assert(event_command_exec_status == CL_COMPLETE);
+
+    if (track_named.count(data->queue) == 0) {
+        track_named.insert(data->queue);
+        TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY,
+            perfetto::DynamicString("clkp-queue_" + std::to_string((uintptr_t)data->queue)),
+            perfetto::Track((uintptr_t)data->queue));
+    }
+
     cl_ulong start, end;
     cl_int err;
     err = tdispatch->clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_START, sizeof(start), &start, nullptr);
@@ -128,14 +132,13 @@ static void callback(cl_event event, cl_int event_command_exec_status, void *use
     CHECK_CL(err, free(data); return, "clGetEventProfilingInfo(CL_PROFILING_COMMAND_END) failed (%i)", err);
     assert(end > start);
 
-    std::string name = kernel_to_string[data->kernel] + "-" + kernel_to_kernel_name[data->kernel] + "-"
-        + std::to_string(data->gidX) + "." + std::to_string(data->gidY) + "." + std::to_string(data->gidZ);
+    std::string name = program_to_string[kernel_to_program[data->kernel]] + "-" + kernel_to_kernel_name[data->kernel]
+        + "-" + std::to_string(data->gidX) + "." + std::to_string(data->gidY) + "." + std::to_string(data->gidZ);
 
     TRACE_EVENT_BEGIN(CLKP_PERFETTO_CATEGORY, perfetto::DynamicString(name), perfetto::Track((uintptr_t)data->queue),
         (uint64_t)start, "program", perfetto::DynamicString(program_to_string[kernel_to_program[data->kernel]]),
-        "kernel", perfetto::DynamicString(kernel_to_string[data->kernel]), "kernel_name",
-        perfetto::DynamicString(kernel_to_kernel_name[data->kernel]), "gidX", data->gidX, "gidY", data->gidY, "gidZ",
-        data->gidZ);
+        "kernel_name", perfetto::DynamicString(kernel_to_kernel_name[data->kernel]), "gidX", data->gidX, "gidY",
+        data->gidY, "gidZ", data->gidZ);
     TRACE_EVENT_END(CLKP_PERFETTO_CATEGORY, perfetto::Track((uintptr_t)data->queue), (uint64_t)end);
 
     free(data);
@@ -149,8 +152,7 @@ static cl_int clkp_clEnqueueNDRangeKernel(cl_command_queue command_queue, cl_ker
     size_t gidY = work_dim > 1 ? global_work_size[1] : 1;
     size_t gidZ = work_dim > 2 ? global_work_size[2] : 1;
     TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clEnqueueNDRangeKernel", "program",
-        perfetto::DynamicString(program_to_string[kernel_to_program[kernel]]), "kernel",
-        perfetto::DynamicString(kernel_to_string[kernel]), "kernel_name",
+        perfetto::DynamicString(program_to_string[kernel_to_program[kernel]]), "kernel_name",
         perfetto::DynamicString(kernel_to_kernel_name[kernel]), "gidX", gidX, "gidY", gidY, "gidZ", gidZ);
 
     bool event_is_null = event == nullptr;
@@ -203,9 +205,6 @@ static cl_command_queue clkp_clCreateCommandQueue(
     properties |= CL_QUEUE_PROFILING_ENABLE;
     auto queue = tdispatch->clCreateCommandQueue(context, device, properties, errcode_ret);
 
-    TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY,
-        perfetto::DynamicString("clkp-queue_" + std::to_string((uintptr_t)queue)), perfetto::Track((uintptr_t)queue));
-
     return queue;
 }
 
@@ -238,9 +237,6 @@ static cl_command_queue clkp_clCreateCommandQueueWithProperties(
     properties_array.push_back(0);
 
     auto queue = tdispatch->clCreateCommandQueueWithProperties(context, device, properties_array.data(), errcode_ret);
-
-    TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY,
-        perfetto::DynamicString("clkp-queue_" + std::to_string((uintptr_t)queue)), perfetto::Track((uintptr_t)queue));
 
     return queue;
 }
