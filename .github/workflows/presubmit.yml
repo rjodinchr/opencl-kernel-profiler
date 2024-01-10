@@ -76,8 +76,8 @@ jobs:
           cmake --build build_test
       - name: Test
         run: |
+          LD_DEBUG=libs \
           OCL_ICD_ENABLE_TRACE=1 \
-          OPENCL_LAYERS=$(pwd)/build_test/libopencl-kernel-profiler.so \
           OCL_ICD_FILENAMES=$(pwd)/third_party/pocl/install/lib/libpocl.so \
           $(pwd)/build_test/tests/opencl-kernel-profiler-test $(pwd)/tests/gpu.cl
 
