@@ -1,0 +1,59 @@
+name: Presubmit
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  format:
+    name: Check code formatting
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format clang-format-15
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check format
+        run: |
+          git-clang-format --binary clang-format-15 --diff origin/main --extensions cpp,hpp > output.txt
+          cat output.txt
+          grep -E "(no modified files to format|clang-format did not modify any files)" output.txt
+  build:
+    name: Builds & Tests
+    needs: format
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install ninja-build clang-15
+      - name: Build Perfetto
+        run: |
+          git clone --depth 1 --branch v39.0 https://android.googlesource.com/platform/external/perfetto third_party/perfetto
+          $(pwd)/third_party/perfetto/tools/install-build-deps
+          $(pwd)/third_party/perfetto/tools/gen_amalgamated --output $(pwd)/third_party/perfetto/sdk/perfetto
+      - name: Clone OpenCL-Headers
+        run: git clone --depth 1 --branch v2023.04.17 https://github.com/KhronosGroup/OpenCL-Headers.git third_party/opencl-headers
+      - name: Build debug
+        run: |
+          cmake -B build_debug -S . -G Ninja \
+            -DPERFETTO_SDK_PATH="$(pwd)/third_party/perfetto/sdk" \
+            -DOPENCL_HEADER_PATH="$(pwd)/third_party/opencl-headers" \
+            -DCMAKE_CXX_COMPILER="$(which clang++)" \
+            -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build_debug
+      - name: Build release
+        run: |
+          cmake -B build_release -S . -G Ninja \
+            -DPERFETTO_SDK_PATH="$(pwd)/third_party/perfetto/sdk" \
+            -DOPENCL_HEADER_PATH="$(pwd)/third_party/opencl-headers" \
+            -DCMAKE_CXX_COMPILER="$(which clang++)" \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build_release
