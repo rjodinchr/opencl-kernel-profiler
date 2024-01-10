@@ -78,6 +78,5 @@ jobs:
         run: |
           LD_DEBUG=libs \
           OCL_ICD_ENABLE_TRACE=1 \
-          OCL_ICD_FILENAMES=$(pwd)/third_party/pocl/install/lib/libpocl.so \
           $(pwd)/build_test/tests/opencl-kernel-profiler-test $(pwd)/tests/gpu.cl
 
