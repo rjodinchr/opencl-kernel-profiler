@@ -57,3 +57,27 @@ jobs:
             -DCMAKE_CXX_COMPILER="$(which clang++)" \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build_release
+      - name: Install pocl dependencies
+        run: |
+          sudo apt-get install -y python3-dev libpython3-dev build-essential ocl-icd-libopencl1 cmake git pkg-config libclang-15-dev clang-15 llvm-15 make ninja-build ocl-icd-libopencl1 ocl-icd-dev ocl-icd-opencl-dev libhwloc-dev zlib1g zlib1g-dev clinfo dialog apt-utils libxml2-dev libclang-cpp15-dev libclang-cpp15 llvm-15-dev
+      - name: Build pocl
+        run: |
+          git clone --depth 1 --branch v5.0 https://github.com/pocl/pocl.git third_party/pocl
+          cmake -B third_party/pocl/build -S third_party/pocl -DCMAKE_INSTALL_PREFIX=third_party/pocl/install -DCMAKE_BUILD_TYPE=Release -G Ninja
+          cmake --build third_party/pocl/build --target install
+      - name: Build test
+        run: |
+          cmake -B build_test -S . -G Ninja \
+            -DPERFETTO_SDK_PATH="$(pwd)/third_party/perfetto/sdk" \
+            -DOPENCL_HEADER_PATH="$(pwd)/third_party/opencl-headers" \
+            -DCMAKE_CXX_COMPILER="$(which clang++)" \
+            -DCLKP_BUILD_TESTS=1 \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build_test
+      - name: Test
+        run: |
+          OCL_ICD_ENABLE_TRACE=1 \
+          OPENCL_LAYERS=$(pwd)/build/libopencl-kernel-profiler.so \
+          OCL_ICD_FILENAMES=$(pwd)/third_party/pocl/install/lib/libpocl.so \
+          $(pwd)/build_test/tests/opencl-kernel-profiler-test $(pwd)/tests/gpu.cl
+

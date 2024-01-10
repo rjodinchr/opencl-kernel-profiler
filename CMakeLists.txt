@@ -45,3 +45,7 @@ target_compile_options(opencl-kernel-profiler PUBLIC "-DTRACE_MAX_SIZE=${TRACE_M
 
 set(TRACE_DEST "opencl-kernel-profiler.trace" CACHE STRING "Perfetto trace filename")
 target_compile_options(opencl-kernel-profiler PUBLIC "-DTRACE_DEST=\"${TRACE_DEST}\"")
+
+if (CLKP_BUILD_TESTS)
+  add_subdirectory(tests)
+endif ()
