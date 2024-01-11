@@ -65,11 +65,11 @@ jobs:
         run: |
           git clone --depth 1 --branch v5.0 https://github.com/pocl/pocl.git third_party/pocl
           cmake -B third_party/pocl/build -S third_party/pocl -G Ninja \
+            -DCMAKE_INSTALL_PREFIX=$(pwd)/third_party/pocl/install \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER="$(which clang++)" \
             -DCMAKE_C_COMPILER="$(which clang)"
-          cmake --build third_party/pocl/build
-          cmake --install third_party/pocl/build --prefix third_party/pocl/install
+          cmake --build third_party/pocl/build --target install
       - name: Build OpenCL-ICD-Loader
         run: |
           git clone --depth 1 --branch v2023.04.17 https://github.com/KhronosGroup/OpenCL-ICD-Loader.git third_party/opencl-icd-loader
