@@ -97,6 +97,7 @@ jobs:
           LD_LIBRARY_PATH=$(pwd)/third_party/opencl-icd-loader/build:$LD_LIBRARY_PATH \
           CVK_TRACE_DEST=$(pwd)/trace \
           $(pwd)/build_test/tests/opencl-kernel-profiler-test $(pwd)/tests/gpu.cl
+          ls -lh
           echo "SELECT EXTRACT_ARG(arg_set_id, 'debug.string') FROM slice WHERE slice.name='clCreateProgramWithSource-args'" | $(pwd)/third_party/perfetto/out/linux_clang_release/trace_processor_shell -q /dev/stdin $(pwd)/trace
           cat output.txt
           cat output.txt | grep -F "$(grep kernel $(pwd)/tests/gpu.cl)"
