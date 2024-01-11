@@ -14,9 +14,9 @@
 
 #define CL_TARGET_OPENCL_VERSION 120
 #include <CL/cl.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdbool.h>
 
 void vector_inc(
     size_t buffer_size, void *buffer, const char **source, const size_t *source_length, const size_t *global_work_size)
