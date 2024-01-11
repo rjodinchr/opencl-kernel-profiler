@@ -63,14 +63,28 @@ jobs:
       - name: Build pocl
         run: |
           git clone --depth 1 --branch v5.0 https://github.com/pocl/pocl.git third_party/pocl
-          cmake -B third_party/pocl/build -S third_party/pocl -DCMAKE_INSTALL_PREFIX=third_party/pocl/install -DCMAKE_BUILD_TYPE=Release -G Ninja
+          cmake -B third_party/pocl/build -S third_party/pocl -G Ninja \
+            -DCMAKE_INSTALL_PREFIX=third_party/pocl/install \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER="$(which clang++)" \
+            -DCMAKE_C_COMPILER="$(which clang)"
           cmake --build third_party/pocl/build --target install
+      - name: Build OpenCL-ICD-Loader
+        run: |
+          git clone --depth 1 --branch v2023.04.17 https://github.com/KhronosGroup/OpenCL-ICD-Loader.git third_party/opencl-icd-loader
+          cmake -B third_party/opencl-icd-loader/build -S third_party/opencl-icd-loader -G Ninja \
+            -DOPENCL_ICD_LOADER_HEADERS_DIR=$(pwd)/third_party/opencl-headers \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER="$(which clang++)" \
+            -DCMAKE_C_COMPILER="$(which clang)"
+          cmake --build third_party/opencl-icd-loader/build
       - name: Build test
         run: |
           cmake -B build_test -S . -G Ninja \
             -DPERFETTO_SDK_PATH="$(pwd)/third_party/perfetto/sdk" \
             -DOPENCL_HEADER_PATH="$(pwd)/third_party/opencl-headers" \
             -DCMAKE_CXX_COMPILER="$(which clang++)" \
+            -DCMAKE_C_COMPILER="$(which clang)" \
             -DCLKP_BUILD_TESTS=1 \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build_test
@@ -78,5 +92,8 @@ jobs:
         run: |
           LD_DEBUG=libs \
           OCL_ICD_ENABLE_TRACE=1 \
+          OPENCL_LAYERS=$(pwd)/build_test/libopencl-kernel-profiler.so \
+          OCL_ICD_FILENAMES=$(pwd)/third_party/pocl/install/lib/libpocl.so \
+          LD_LIBRARY_PATH=$(pwd)/third_party/opencl-icd-loader/build:$LD_LIBRARY_PATH \
           $(pwd)/build_test/tests/opencl-kernel-profiler-test $(pwd)/tests/gpu.cl
 
