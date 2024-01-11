@@ -38,7 +38,7 @@ jobs:
         run: |
           git clone --depth 1 --branch v39.0 https://android.googlesource.com/platform/external/perfetto third_party/perfetto
           $(pwd)/third_party/perfetto/tools/install-build-deps
-          $(pwd)/third_party/perfetto/tools/gen_amalgamated --output $(pwd)/third_party/perfetto/sdk/perfetto
+          $(pwd)/third_party/perfetto/tools/ninja -C $(pwd)/third_party/perfetto/out/linux_clang_release perfetto traced trace_processor_shell
       - name: Clone OpenCL-Headers
         run: git clone --depth 1 --branch v2023.04.17 https://github.com/KhronosGroup/OpenCL-Headers.git third_party/opencl-headers
       - name: Build debug
@@ -90,10 +90,16 @@ jobs:
           cmake --build build_test
       - name: Test
         run: |
-          LD_DEBUG=libs \
+          $(pwd)/third_party/perfetto/out/linux_clang_release/traced &
+          $(pwd)/third_party/perfetto/out/linux_clang_release/perfetto -c $(pwd)/tests/perfetto_config --txt -o $(pwd)/trace &
+          sleep 1
           OCL_ICD_ENABLE_TRACE=1 \
           OPENCL_LAYERS=$(pwd)/build_test/libopencl-kernel-profiler.so \
           OCL_ICD_FILENAMES=$(pwd)/third_party/pocl/install/lib/libpocl.so \
           LD_LIBRARY_PATH=$(pwd)/third_party/opencl-icd-loader/build:$LD_LIBRARY_PATH \
           $(pwd)/build_test/tests/opencl-kernel-profiler-test $(pwd)/tests/gpu.cl
-
+          pkill -x perfetto
+          while [[ -n $(pgrep -x perfetto) ]]; do sleep 0.2; done
+          echo "SELECT EXTRACT_ARG(arg_set_id, 'debug.string') FROM slice WHERE slice.name='clCreateProgramWithSource-args'" | $(pwd)/third_party/perfetto/out/linux_clang_release/trace_processor_shell -q /dev/stdin $(pwd)/trace &> output.txt
+          cat output.txt
+          cat output | grep -F "$(head -n 1 $(pwd)/tests/gpu.cl)"
