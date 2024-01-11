@@ -38,6 +38,7 @@ jobs:
         run: |
           git clone --depth 1 --branch v39.0 https://android.googlesource.com/platform/external/perfetto third_party/perfetto
           $(pwd)/third_party/perfetto/tools/install-build-deps
+          $(pwd)/third_party/perfetto/tools/setup_all_configs.py
           $(pwd)/third_party/perfetto/tools/ninja -C $(pwd)/third_party/perfetto/out/linux_clang_release perfetto traced trace_processor_shell
       - name: Clone OpenCL-Headers
         run: git clone --depth 1 --branch v2023.04.17 https://github.com/KhronosGroup/OpenCL-Headers.git third_party/opencl-headers
