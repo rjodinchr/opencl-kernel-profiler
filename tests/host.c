@@ -46,6 +46,8 @@ void vector_inc(
 
 int main(int argc, char **argv)
 {
+    printf("Starting OpenCL application\n");
+
     uint32_t buffer[NB_ELEM];
     for (unsigned i = 0; i < NB_ELEM; i++) {
         buffer[i] = i + 42;
@@ -79,5 +81,6 @@ int main(int argc, char **argv)
         }
     }
 
+    printf("OpenCL application completed!\n");
     return success ? 0 : -1;
 }
