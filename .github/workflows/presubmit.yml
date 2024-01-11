@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 0
       - name: Check format
         run: |
-          git-clang-format --binary clang-format-15 --diff origin/main --extensions cpp,hpp > output.txt
+          git-clang-format --binary clang-format-15 --diff origin/main --extensions cpp,hpp,c,cl > output.txt
           cat output.txt
           grep -E "(no modified files to format|clang-format did not modify any files)" output.txt
   build:
@@ -89,7 +89,7 @@ jobs:
             -DCLKP_BUILD_TESTS=1 \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build_test
-      - name: Test
+      - name: Tests
         run: |
           $(pwd)/third_party/perfetto/out/linux_clang_release/traced &
           $(pwd)/third_party/perfetto/out/linux_clang_release/perfetto -c $(pwd)/tests/perfetto_config --txt -o $(pwd)/trace &
@@ -103,4 +103,4 @@ jobs:
           while [[ -n $(pgrep -x perfetto) ]]; do sleep 0.2; done
           echo "SELECT EXTRACT_ARG(arg_set_id, 'debug.string') FROM slice WHERE slice.name='clCreateProgramWithSource-args'" | $(pwd)/third_party/perfetto/out/linux_clang_release/trace_processor_shell -q /dev/stdin $(pwd)/trace &> output.txt
           cat output.txt
-          cat output | grep -F "$(head -n 1 $(pwd)/tests/gpu.cl)"
+          cat output.txt | grep -F "$(grep kernel $(pwd)/tests/gpu.cl)"
