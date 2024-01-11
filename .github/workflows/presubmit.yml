@@ -68,6 +68,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER="$(which clang++)" \
             -DCMAKE_C_COMPILER="$(which clang)"
+          cmake --build third_party/pocl/build
           cmake --install third_party/pocl/build --prefix third_party/pocl/install
       - name: Build OpenCL-ICD-Loader
         run: |
