@@ -26,6 +26,10 @@ cmake -B <build_dir> -S <path-to-opencl-kernel-profiler> -DOPENCL_HEADER_PATH=<p
 cmake --build <build_dir>
 ```
 
+For real life examples, have a look at:
+- ChromeOS [ebuild](https://chromium.googlesource.com/chromiumos/overlays/chromiumos-overlay/+/main/dev-libs/opencl-kernel-profiler/opencl-kernel-profiler-0.0.1.ebuild)
+- Github presubmit [configuration](https://github.com/rjodinchr/opencl-kernel-profiler/blob/main/.github/workflows/presubmit.yml)
+
 # Build options
 
 * `OPENCL_HEADER_PATH` (REQUIRED): path to [OpenCL-Headers](https://github.com/KhronosGroup/OpenCL-Headers).
