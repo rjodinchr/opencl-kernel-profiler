@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required (VERSION 3.1)
+cmake_minimum_required (VERSION 3.24)
 project (opencl-kernel-profiler)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -24,10 +24,15 @@ if (NOT OPENCL_HEADER_PATH)
   message(FATAL_ERROR "OPENCL_HEADER_PATH not defined")
 endif ()
 
-set (SOURCES src/opencl-kernel-profiler.cpp ${PERFETTO_SDK_PATH}/perfetto.cc)
-include_directories(${PERFETTO_SDK_PATH} ${OPENCL_HEADER_PATH})
+if (NOT PERFETTO_LIBRARY)
+  add_library(perfetto STATIC ${PERFETTO_SDK_PATH}/perfetto.cc)
+  set_target_properties(perfetto PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  set(PERFETTO_LIBRARY perfetto)
+endif()
 
-add_library (opencl-kernel-profiler MODULE ${SOURCES})
+add_library (opencl-kernel-profiler MODULE src/opencl-kernel-profiler.cpp)
+target_include_directories(opencl-kernel-profiler PUBLIC ${PERFETTO_SDK_PATH} ${OPENCL_HEADER_PATH})
+target_link_libraries(opencl-kernel-profiler ${PERFETTO_LIBRARY})
 
 set(BACKEND "InProcess"
   CACHE STRING "Select perfetto backend")
