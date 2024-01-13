@@ -40,8 +40,28 @@ jobs:
           $(pwd)/third_party/perfetto/tools/install-build-deps
           $(pwd)/third_party/perfetto/tools/setup_all_configs.py
           $(pwd)/third_party/perfetto/tools/ninja -C $(pwd)/third_party/perfetto/out/linux_clang_release trace_processor_shell
-      - name: Clone OpenCL-Headers
-        run: git clone --depth 1 --branch v2023.04.17 https://github.com/KhronosGroup/OpenCL-Headers.git third_party/opencl-headers
+      - name: Build OpenCL-ICD-Loader
+        run: |
+          git clone --depth 1 --branch v2023.04.17 https://github.com/KhronosGroup/OpenCL-Headers.git third_party/opencl-headers
+          git clone --depth 1 --branch v2023.04.17 https://github.com/KhronosGroup/OpenCL-ICD-Loader.git third_party/opencl-icd-loader
+          cmake -B third_party/opencl-icd-loader/build -S third_party/opencl-icd-loader -G Ninja \
+            -DOPENCL_ICD_LOADER_HEADERS_DIR=$(pwd)/third_party/opencl-headers \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER="$(which clang++)" \
+            -DCMAKE_C_COMPILER="$(which clang)"
+          cmake --build third_party/opencl-icd-loader/build
+      - name: Install pocl dependencies
+        run: |
+          sudo apt-get install -y python3-dev libpython3-dev build-essential ocl-icd-libopencl1 cmake git pkg-config libclang-15-dev clang-15 llvm-15 make ninja-build ocl-icd-libopencl1 ocl-icd-dev ocl-icd-opencl-dev libhwloc-dev zlib1g zlib1g-dev clinfo dialog apt-utils libxml2-dev libclang-cpp15-dev libclang-cpp15 llvm-15-dev
+      - name: Build pocl
+        run: |
+          git clone --depth 1 --branch v5.0 https://github.com/pocl/pocl.git third_party/pocl
+          cmake -B third_party/pocl/build -S third_party/pocl -G Ninja \
+            -DCMAKE_INSTALL_PREFIX=$(pwd)/third_party/pocl/install \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER="$(which clang++)" \
+            -DCMAKE_C_COMPILER="$(which clang)"
+          cmake --build third_party/pocl/build --target install
       - name: Build debug
         run: |
           cmake -B build_debug -S . -G Ninja \
@@ -56,47 +76,17 @@ jobs:
             -DPERFETTO_SDK_PATH="$(pwd)/third_party/perfetto/sdk" \
             -DOPENCL_HEADER_PATH="$(pwd)/third_party/opencl-headers" \
             -DCMAKE_CXX_COMPILER="$(which clang++)" \
-            -DCMAKE_BUILD_TYPE=Release
-          cmake --build build_release
-      - name: Install pocl dependencies
-        run: |
-          sudo apt-get install -y python3-dev libpython3-dev build-essential ocl-icd-libopencl1 cmake git pkg-config libclang-15-dev clang-15 llvm-15 make ninja-build ocl-icd-libopencl1 ocl-icd-dev ocl-icd-opencl-dev libhwloc-dev zlib1g zlib1g-dev clinfo dialog apt-utils libxml2-dev libclang-cpp15-dev libclang-cpp15 llvm-15-dev
-      - name: Build pocl
-        run: |
-          git clone --depth 1 --branch v5.0 https://github.com/pocl/pocl.git third_party/pocl
-          cmake -B third_party/pocl/build -S third_party/pocl -G Ninja \
-            -DCMAKE_INSTALL_PREFIX=$(pwd)/third_party/pocl/install \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_COMPILER="$(which clang++)" \
-            -DCMAKE_C_COMPILER="$(which clang)"
-          cmake --build third_party/pocl/build --target install
-      - name: Build OpenCL-ICD-Loader
-        run: |
-          git clone --depth 1 --branch v2023.04.17 https://github.com/KhronosGroup/OpenCL-ICD-Loader.git third_party/opencl-icd-loader
-          cmake -B third_party/opencl-icd-loader/build -S third_party/opencl-icd-loader -G Ninja \
-            -DOPENCL_ICD_LOADER_HEADERS_DIR=$(pwd)/third_party/opencl-headers \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_COMPILER="$(which clang++)" \
-            -DCMAKE_C_COMPILER="$(which clang)"
-          cmake --build third_party/opencl-icd-loader/build
-      - name: Build test
-        run: |
-          cmake -B build_test -S . -G Ninja \
-            -DPERFETTO_SDK_PATH="$(pwd)/third_party/perfetto/sdk" \
-            -DOPENCL_HEADER_PATH="$(pwd)/third_party/opencl-headers" \
-            -DCMAKE_CXX_COMPILER="$(which clang++)" \
             -DCMAKE_C_COMPILER="$(which clang)" \
             -DCLKP_BUILD_TESTS=1 \
             -DCMAKE_BUILD_TYPE=Release
-          cmake --build build_test
+          cmake --build build_release
       - name: Tests
         run: |
           OCL_ICD_ENABLE_TRACE=1 \
-          OPENCL_LAYERS=$(pwd)/build_test/libopencl-kernel-profiler.so \
+          OPENCL_LAYERS=$(pwd)/build_release/libopencl-kernel-profiler.so \
           OCL_ICD_FILENAMES=$(pwd)/third_party/pocl/install/lib/libpocl.so \
           LD_LIBRARY_PATH=$(pwd)/third_party/opencl-icd-loader/build:$LD_LIBRARY_PATH \
           CLKP_TRACE_DEST=$(pwd)/trace \
-          $(pwd)/build_test/tests/opencl-kernel-profiler-test $(pwd)/tests/gpu.cl
-          echo "SELECT EXTRACT_ARG(arg_set_id, 'debug.string') FROM slice WHERE slice.name='clCreateProgramWithSource-args'" | $(pwd)/third_party/perfetto/out/linux_clang_release/trace_processor_shell -q /dev/stdin $(pwd)/trace &> output.txt
-          cat output.txt
-          grep -F "$(grep kernel $(pwd)/tests/gpu.cl)" output.txt
+          $(pwd)/build_release/tests/opencl-kernel-profiler-test $(pwd)/tests/gpu.cl
+          TRACE_PROCESSOR_SHELL=$(pwd)/third_party/perfetto/out/linux_clang_release/trace_processor_shell \
+          $(pwd)/tests/test.sh "$(pwd)/trace"

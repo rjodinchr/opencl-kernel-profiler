@@ -113,6 +113,8 @@ struct callback_data {
 std::set<cl_command_queue> track_named;
 static void callback(cl_event event, cl_int event_command_exec_status, void *user_data)
 {
+    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clkp-callback");
+
     struct callback_data *data = (struct callback_data *)user_data;
     assert(data != nullptr);
     assert(event_command_exec_status == CL_COMPLETE);

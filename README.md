@@ -34,6 +34,7 @@ For real life examples, have a look at:
 
 * `OPENCL_HEADER_PATH` (REQUIRED): path to [OpenCL-Headers](https://github.com/KhronosGroup/OpenCL-Headers).
 * `PERFETTO_SDK_PATH` (REQUIRED): path to [perfetto](https://github.com/google/perfetto) sdk (`opencl-kernel-profiler` is looking for `PERFETTO_SDK_PATH/perfetto.cc` and `PERFETTO_SDK_PATH/perfetto.h`).
+* `PERFETTO_LIBRARY`: name of a perfetto library already available (avoid having to compile `perfetto.cc`).
 * `BACKEND`: [perfetto](https://github.com/google/perfetto) backend to use
   * `InProcess` (default): the application will generate the traces ([perfetto documentation](https://perfetto.dev/docs/instrumentation/tracing-sdk#in-process-mode)). Build options and environment variables can be used to control the maximum size of traces and the destination file where the traces will be recorded.
   * `System`: perfetto `traced` daemon will be responsible for generating the traces ([perfetto documentation](https://perfetto.dev/docs/instrumentation/tracing-sdk#system-mode)).
