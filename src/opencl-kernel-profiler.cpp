@@ -302,9 +302,9 @@ CL_API_ENTRY cl_int CL_API_CALL clGetLayerInfo(
     return CL_SUCCESS;
 }
 
-#ifdef BACKEND_INPROCESS
 void clDeinitLayer()
 {
+#ifdef BACKEND_INPROCESS
     gTracingSession->StopBlocking();
     std::vector<char> trace_data(gTracingSession->ReadTraceBlocking());
 
@@ -312,8 +312,10 @@ void clDeinitLayer()
     output.open(get_trace_dest(), std::ios::out | std::ios::binary);
     output.write(&trace_data[0], trace_data.size());
     output.close();
-}
+#else
+    perfetto::TrackEvent::Flush();
 #endif
+}
 
 CL_API_ENTRY cl_int CL_API_CALL clInitLayer(cl_uint num_entries, const struct _cl_icd_dispatch *target_dispatch,
     cl_uint *num_entries_out, const struct _cl_icd_dispatch **layer_dispatch_ret)
@@ -323,17 +325,6 @@ CL_API_ENTRY cl_int CL_API_CALL clInitLayer(cl_uint num_entries, const struct _c
         return CL_INVALID_VALUE;
     if (num_entries < sizeof(dispatch) / sizeof(dispatch.clGetPlatformIDs))
         return CL_INVALID_VALUE;
-
-    memset(&dispatch, 0, sizeof(dispatch));
-    dispatch.clCreateProgramWithSource = clkp_clCreateProgramWithSource;
-    dispatch.clCreateKernel = clkp_clCreateKernel;
-    dispatch.clEnqueueNDRangeKernel = clkp_clEnqueueNDRangeKernel;
-    dispatch.clCreateCommandQueue = clkp_clCreateCommandQueue;
-    dispatch.clCreateCommandQueueWithProperties = clkp_clCreateCommandQueueWithProperties;
-
-    tdispatch = target_dispatch;
-    *layer_dispatch_ret = &dispatch;
-    *num_entries_out = sizeof(dispatch) / sizeof(dispatch.clGetPlatformIDs);
 
     perfetto::TracingInitArgs args;
 #ifdef BACKEND_INPROCESS
@@ -355,10 +346,30 @@ CL_API_ENTRY cl_int CL_API_CALL clInitLayer(cl_uint num_entries, const struct _c
     gTracingSession = perfetto::Tracing::NewTrace();
     gTracingSession->Setup(cfg);
     gTracingSession->StartBlocking();
+#endif
+
+    const uint32_t max_retry = 100;
+    uint32_t retry = 0;
+    while ((retry++ < max_retry) && !TRACE_EVENT_CATEGORY_ENABLED(CLKP_PERFETTO_CATEGORY)) {
+        usleep(1);
+    }
+    if (!TRACE_EVENT_CATEGORY_ENABLED(CLKP_PERFETTO_CATEGORY)) {
+        PRINT("perfetto category does not seem to be enabled");
+    }
+
+    memset(&dispatch, 0, sizeof(dispatch));
+    dispatch.clCreateProgramWithSource = clkp_clCreateProgramWithSource;
+    dispatch.clCreateKernel = clkp_clCreateKernel;
+    dispatch.clEnqueueNDRangeKernel = clkp_clEnqueueNDRangeKernel;
+    dispatch.clCreateCommandQueue = clkp_clCreateCommandQueue;
+    dispatch.clCreateCommandQueueWithProperties = clkp_clCreateCommandQueueWithProperties;
+
+    tdispatch = target_dispatch;
+    *layer_dispatch_ret = &dispatch;
+    *num_entries_out = sizeof(dispatch) / sizeof(dispatch.clGetPlatformIDs);
 
     bool atexit_registered = atexit(clDeinitLayer) == 0;
     CHECK(atexit_registered, return CL_OUT_OF_RESOURCES, "Could not register clDeinitLayer using atexit()");
-#endif
 
     return CL_SUCCESS;
 }
