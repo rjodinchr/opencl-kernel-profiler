@@ -68,7 +68,7 @@ static const struct _cl_icd_dispatch *tdispatch;
 /* CREATE KERNEL & PROGRAM ***************************************************/
 /*****************************************************************************/
 
-std::mutex g_lock;
+static std::mutex g_lock;
 
 static uint32_t program_number = 0;
 static std::map<cl_program, std::string> program_to_string;
@@ -110,7 +110,7 @@ struct callback_data {
     size_t gidX, gidY, gidZ;
 };
 
-std::set<cl_command_queue> track_named;
+static std::set<cl_command_queue> track_named;
 static void callback(cl_event event, cl_int event_command_exec_status, void *user_data)
 {
     TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clkp-callback");
@@ -158,6 +158,7 @@ static cl_int clkp_clEnqueueNDRangeKernel(cl_command_queue command_queue, cl_ker
     const size_t *global_work_offset, const size_t *global_work_size, const size_t *local_work_size,
     cl_uint num_events_in_wait_list, const cl_event *event_wait_list, cl_event *event)
 {
+    std::lock_guard<std::mutex> lock(g_lock);
     size_t gidX = work_dim > 0 ? global_work_size[0] : 1;
     size_t gidY = work_dim > 1 ? global_work_size[1] : 1;
     size_t gidZ = work_dim > 2 ? global_work_size[2] : 1;
@@ -218,6 +219,7 @@ static cl_int clkp_clEnqueueNDRangeKernel(cl_command_queue command_queue, cl_ker
 static cl_command_queue clkp_clCreateCommandQueue(
     cl_context context, cl_device_id device, cl_command_queue_properties properties, cl_int *errcode_ret)
 {
+    std::lock_guard<std::mutex> lock(g_lock);
     TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateCommandQueue", "properties", properties);
     properties |= CL_QUEUE_PROFILING_ENABLE;
     return tdispatch->clCreateCommandQueue(context, device, properties, errcode_ret);
@@ -226,6 +228,7 @@ static cl_command_queue clkp_clCreateCommandQueue(
 static cl_command_queue clkp_clCreateCommandQueueWithProperties(
     cl_context context, cl_device_id device, const cl_queue_properties *properties, cl_int *errcode_ret)
 {
+    std::lock_guard<std::mutex> lock(g_lock);
     TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateCommandQueueWithProperties");
     std::vector<cl_queue_properties> properties_array;
     bool cl_queue_properties_found = false;
@@ -315,6 +318,7 @@ void clDeinitLayer()
 CL_API_ENTRY cl_int CL_API_CALL clInitLayer(cl_uint num_entries, const struct _cl_icd_dispatch *target_dispatch,
     cl_uint *num_entries_out, const struct _cl_icd_dispatch **layer_dispatch_ret)
 {
+    std::lock_guard<std::mutex> lock(g_lock);
     if (!target_dispatch || !num_entries_out || !layer_dispatch_ret)
         return CL_INVALID_VALUE;
     if (num_entries < sizeof(dispatch) / sizeof(dispatch.clGetPlatformIDs))
