@@ -16,14 +16,17 @@
 
 #include <CL/cl_layer.h>
 #include <assert.h>
+#include <condition_variable>
 #include <fstream>
 #include <map>
 #include <mutex>
 #include <perfetto.h>
+#include <queue>
 #include <set>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <thread>
 
 /*****************************************************************************/
 /* PERFETTO GLOBAL VARIABLES *************************************************/
@@ -107,10 +110,20 @@ static cl_kernel clkp_clCreateKernel(cl_program program, const char *kernel_name
 struct callback_data {
     cl_command_queue queue;
     cl_kernel kernel;
+    cl_event event;
     size_t gidX, gidY, gidZ;
 };
 
-static std::set<cl_command_queue> track_named;
+struct ThreadInfo {
+    std::mutex lock;
+    std::condition_variable cv;
+    std::queue<callback_data *> callbacks;
+    bool stop;
+};
+
+static std::map<cl_command_queue, ThreadInfo *> queue_to_thread_info;
+static std::map<cl_command_queue, std::thread> queue_to_thread;
+
 static void callback(cl_event event, cl_int event_command_exec_status, void *user_data)
 {
     TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clkp-callback");
@@ -119,9 +132,36 @@ static void callback(cl_event event, cl_int event_command_exec_status, void *use
     assert(data != nullptr);
     assert(event_command_exec_status == CL_COMPLETE);
     cl_command_queue queue = data->queue;
+    ThreadInfo *thread_info = queue_to_thread_info[queue];
+    {
+        std::lock_guard<std::mutex> lock(thread_info->lock);
+        thread_info->callbacks.push(data);
+        thread_info->cv.notify_all();
+    }
+}
+
+static callback_data *get_callback(ThreadInfo *thread_info)
+{
+    std::unique_lock<std::mutex> lock(thread_info->lock);
+    while (thread_info->callbacks.empty()) {
+        if (thread_info->stop) {
+            return nullptr;
+        }
+        TRACE_EVENT_BEGIN(CLKP_PERFETTO_CATEGORY, "clkp_wait");
+        thread_info->cv.wait(lock);
+        TRACE_EVENT_END(CLKP_PERFETTO_CATEGORY);
+    }
+    callback_data *data = thread_info->callbacks.front();
+    thread_info->callbacks.pop();
+    return data;
+}
+
+static void trace_callback(callback_data *data)
+{
+    cl_command_queue queue = data->queue;
     cl_kernel kernel = data->kernel;
+    cl_event event = data->event;
     size_t gidX = data->gidX, gidY = data->gidY, gidZ = data->gidZ;
-    free(data);
 
     cl_ulong start, end;
     cl_int err;
@@ -152,6 +192,21 @@ static void callback(cl_event event, cl_int event_command_exec_status, void *use
         (uint64_t)start, "program", perfetto::DynamicString(program_string), "kernel_name",
         perfetto::DynamicString(kernel_name), "gidX", gidX, "gidY", gidY, "gidZ", gidZ);
     TRACE_EVENT_END(CLKP_PERFETTO_CATEGORY, perfetto::Track((uintptr_t)queue), (uint64_t)end);
+
+    tdispatch->clReleaseEvent(event);
+}
+
+static void queue_thread_function(ThreadInfo *thread_info)
+{
+    pthread_setname_np(pthread_self(), "clkp");
+    while (true) {
+        callback_data *data = get_callback(thread_info);
+        if (data == nullptr) {
+            return;
+        }
+        trace_callback(data);
+        free(data);
+    }
 }
 
 static cl_int clkp_clEnqueueNDRangeKernel(cl_command_queue command_queue, cl_kernel kernel, cl_uint work_dim,
@@ -172,13 +227,6 @@ static cl_int clkp_clEnqueueNDRangeKernel(cl_command_queue command_queue, cl_ker
         CHECK_ALLOC(event, return CL_OUT_OF_HOST_MEMORY);
     }
 
-    if (track_named.count(command_queue) == 0) {
-        track_named.insert(command_queue);
-        TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY,
-            perfetto::DynamicString("clkp-queue_" + std::to_string((uintptr_t)command_queue)),
-            perfetto::Track((uintptr_t)command_queue));
-    }
-
     cl_int err = tdispatch->clEnqueueNDRangeKernel(command_queue, kernel, work_dim, global_work_offset,
         global_work_size, local_work_size, num_events_in_wait_list, event_wait_list, event);
 
@@ -187,12 +235,8 @@ static cl_int clkp_clEnqueueNDRangeKernel(cl_command_queue command_queue, cl_ker
         if (clean_user_data) {
             free(data);
         }
-        if (event_is_null) {
-            if (err == CL_SUCCESS) {
-                cl_int err_release = tdispatch->clReleaseEvent(*event);
-                CHECK_CL(err_release, /* do nothing */, "clReleaseEvent failed (%i)", err);
-            }
-            free(event);
+        if (!event_is_null) {
+            tdispatch->clRetainEvent(*event);
         }
     };
     CHECK_CL(err, clean(); return err, "clEnqueueNDRangeKernel failed (%i)", err);
@@ -201,6 +245,7 @@ static cl_int clkp_clEnqueueNDRangeKernel(cl_command_queue command_queue, cl_ker
     CHECK_ALLOC(data, clean(); return err);
     data->queue = command_queue;
     data->kernel = kernel;
+    data->event = *event;
     data->gidX = gidX;
     data->gidY = gidY;
     data->gidZ = gidZ;
@@ -216,13 +261,43 @@ static cl_int clkp_clEnqueueNDRangeKernel(cl_command_queue command_queue, cl_ker
 /* CREATE COMMAND QUEUE ******************************************************/
 /*****************************************************************************/
 
+static cl_int clkp_clReleaseCommandQueue(cl_command_queue command_queue)
+{
+    std::lock_guard<std::mutex> lock(g_lock);
+    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clReleaseCommandQueue");
+    auto ret = tdispatch->clReleaseCommandQueue(command_queue);
+
+    ThreadInfo *thread_info = queue_to_thread_info[command_queue];
+    {
+        std::lock_guard<std::mutex> lock(thread_info->lock);
+        thread_info->stop = true;
+        thread_info->cv.notify_all();
+    }
+    queue_to_thread[command_queue].join();
+    queue_to_thread.erase(command_queue);
+    queue_to_thread_info.erase(command_queue);
+    delete thread_info;
+
+    return ret;
+}
+
 static cl_command_queue clkp_clCreateCommandQueue(
     cl_context context, cl_device_id device, cl_command_queue_properties properties, cl_int *errcode_ret)
 {
     std::lock_guard<std::mutex> lock(g_lock);
     TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateCommandQueue", "properties", properties);
     properties |= CL_QUEUE_PROFILING_ENABLE;
-    return tdispatch->clCreateCommandQueue(context, device, properties, errcode_ret);
+    auto command_queue = tdispatch->clCreateCommandQueue(context, device, properties, errcode_ret);
+
+    TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY,
+        perfetto::DynamicString("clkp-queue_" + std::to_string((uintptr_t)command_queue)),
+        perfetto::Track((uintptr_t)command_queue));
+    ThreadInfo *thread_info = new ThreadInfo();
+    thread_info->stop = false;
+    queue_to_thread_info[command_queue] = thread_info;
+    queue_to_thread.emplace(command_queue, [thread_info] { queue_thread_function(thread_info); });
+
+    return command_queue;
 }
 
 static cl_command_queue clkp_clCreateCommandQueueWithProperties(
@@ -363,6 +438,7 @@ CL_API_ENTRY cl_int CL_API_CALL clInitLayer(cl_uint num_entries, const struct _c
     dispatch.clEnqueueNDRangeKernel = clkp_clEnqueueNDRangeKernel;
     dispatch.clCreateCommandQueue = clkp_clCreateCommandQueue;
     dispatch.clCreateCommandQueueWithProperties = clkp_clCreateCommandQueueWithProperties;
+    dispatch.clReleaseCommandQueue = clkp_clReleaseCommandQueue;
 
     tdispatch = target_dispatch;
     *layer_dispatch_ret = &dispatch;

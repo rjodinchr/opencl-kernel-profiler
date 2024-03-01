@@ -40,6 +40,12 @@ void vector_inc(
     clEnqueueWriteBuffer(command_queue, cl_buffer, CL_BLOCKING, 0, buffer_size, buffer, 0, NULL, NULL);
     clEnqueueNDRangeKernel(command_queue, kernel, 1, NULL, global_work_size, NULL, 0, NULL, NULL);
     clEnqueueReadBuffer(command_queue, cl_buffer, CL_BLOCKING, 0, buffer_size, buffer, 0, NULL, NULL);
+
+    clReleaseMemObject(cl_buffer);
+    clReleaseKernel(kernel);
+    clReleaseProgram(program);
+    clReleaseCommandQueue(command_queue);
+    clReleaseContext(context);
 }
 
 #define NB_ELEM 1024
