@@ -281,13 +281,35 @@ static cl_int clkp_clReleaseCommandQueue(cl_command_queue command_queue)
     return ret;
 }
 
-static cl_command_queue clkp_clCreateCommandQueue(
-    cl_context context, cl_device_id device, cl_command_queue_properties properties, cl_int *errcode_ret)
+static cl_command_queue create_command_queue(
+    cl_context context, cl_device_id device, const cl_queue_properties *properties, cl_int *errcode_ret)
 {
     std::lock_guard<std::mutex> lock(g_lock);
-    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateCommandQueue", "properties", properties);
-    properties |= CL_QUEUE_PROFILING_ENABLE;
-    auto command_queue = tdispatch->clCreateCommandQueue(context, device, properties, errcode_ret);
+    std::vector<cl_queue_properties> properties_array;
+    bool cl_queue_properties_found = false;
+    if (properties) {
+        for (unsigned i = 0; properties[i] != 0; i += 2) {
+            cl_queue_properties key = properties[i];
+            cl_queue_properties val = properties[i + 1];
+            if (key == CL_QUEUE_PROPERTIES) {
+                TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY, "clCreateCommandQueue-properties", "properties", val);
+
+                val |= CL_QUEUE_PROFILING_ENABLE;
+                cl_queue_properties_found = true;
+            }
+            properties_array.push_back(key);
+            properties_array.push_back(val);
+        }
+    }
+    if (!cl_queue_properties_found) {
+        TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY, "clCreateCommandQueue-properties-not-found");
+        properties_array.push_back(CL_QUEUE_PROPERTIES);
+        properties_array.push_back(CL_QUEUE_PROFILING_ENABLE);
+    }
+    properties_array.push_back(0);
+
+    auto command_queue
+        = tdispatch->clCreateCommandQueueWithProperties(context, device, properties_array.data(), errcode_ret);
 
     TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY,
         perfetto::DynamicString("clkp-queue_" + std::to_string((uintptr_t)command_queue)),
@@ -300,36 +322,19 @@ static cl_command_queue clkp_clCreateCommandQueue(
     return command_queue;
 }
 
+static cl_command_queue clkp_clCreateCommandQueue(
+    cl_context context, cl_device_id device, cl_command_queue_properties properties, cl_int *errcode_ret)
+{
+    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateCommandQueue");
+    cl_queue_properties props[4] = { CL_QUEUE_PROPERTIES, properties, 0, 0 };
+    return create_command_queue(context, device, props, errcode_ret);
+}
+
 static cl_command_queue clkp_clCreateCommandQueueWithProperties(
     cl_context context, cl_device_id device, const cl_queue_properties *properties, cl_int *errcode_ret)
 {
-    std::lock_guard<std::mutex> lock(g_lock);
     TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateCommandQueueWithProperties");
-    std::vector<cl_queue_properties> properties_array;
-    bool cl_queue_properties_found = false;
-    if (properties) {
-        for (unsigned i = 0; properties[i] != 0; i += 2) {
-            cl_queue_properties key = properties[i];
-            cl_queue_properties val = properties[i];
-            if (key == CL_QUEUE_PROPERTIES) {
-                TRACE_EVENT_INSTANT(
-                    CLKP_PERFETTO_CATEGORY, "clCreateCommandQueueWithProperties-properties", "properties", val);
-
-                val |= CL_QUEUE_PROFILING_ENABLE;
-                cl_queue_properties_found = true;
-            }
-            properties_array.push_back(key);
-            properties_array.push_back(val);
-        }
-    }
-    if (!cl_queue_properties_found) {
-        TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY, "clCreateCommandQueueWithProperties-properties-not-found");
-        properties_array.push_back(CL_QUEUE_PROPERTIES);
-        properties_array.push_back(CL_QUEUE_PROFILING_ENABLE);
-    }
-    properties_array.push_back(0);
-
-    return tdispatch->clCreateCommandQueueWithProperties(context, device, properties_array.data(), errcode_ret);
+    return create_command_queue(context, device, properties, errcode_ret);
 }
 
 /*****************************************************************************/
