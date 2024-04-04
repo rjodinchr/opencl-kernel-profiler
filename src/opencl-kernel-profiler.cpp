@@ -281,30 +281,10 @@ static cl_int clkp_clReleaseCommandQueue(cl_command_queue command_queue)
     return ret;
 }
 
-static cl_command_queue clkp_clCreateCommandQueue(
-    cl_context context, cl_device_id device, cl_command_queue_properties properties, cl_int *errcode_ret)
-{
-    std::lock_guard<std::mutex> lock(g_lock);
-    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateCommandQueue", "properties", properties);
-    properties |= CL_QUEUE_PROFILING_ENABLE;
-    auto command_queue = tdispatch->clCreateCommandQueue(context, device, properties, errcode_ret);
-
-    TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY,
-        perfetto::DynamicString("clkp-queue_" + std::to_string((uintptr_t)command_queue)),
-        perfetto::Track((uintptr_t)command_queue));
-    ThreadInfo *thread_info = new ThreadInfo();
-    thread_info->stop = false;
-    queue_to_thread_info[command_queue] = thread_info;
-    queue_to_thread.emplace(command_queue, [thread_info] { queue_thread_function(thread_info); });
-
-    return command_queue;
-}
-
-static cl_command_queue clkp_clCreateCommandQueueWithProperties(
+static cl_command_queue create_command_queue(
     cl_context context, cl_device_id device, const cl_queue_properties *properties, cl_int *errcode_ret)
 {
     std::lock_guard<std::mutex> lock(g_lock);
-    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateCommandQueueWithProperties");
     std::vector<cl_queue_properties> properties_array;
     bool cl_queue_properties_found = false;
     if (properties) {
@@ -329,7 +309,33 @@ static cl_command_queue clkp_clCreateCommandQueueWithProperties(
     }
     properties_array.push_back(0);
 
-    return tdispatch->clCreateCommandQueueWithProperties(context, device, properties_array.data(), errcode_ret);
+    auto command_queue
+        = tdispatch->clCreateCommandQueueWithProperties(context, device, properties_array.data(), errcode_ret);
+
+    TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY,
+        perfetto::DynamicString("clkp-queue_" + std::to_string((uintptr_t)command_queue)),
+        perfetto::Track((uintptr_t)command_queue));
+    ThreadInfo *thread_info = new ThreadInfo();
+    thread_info->stop = false;
+    queue_to_thread_info[command_queue] = thread_info;
+    queue_to_thread.emplace(command_queue, [thread_info] { queue_thread_function(thread_info); });
+
+    return command_queue;
+}
+
+static cl_command_queue clkp_clCreateCommandQueue(
+    cl_context context, cl_device_id device, cl_command_queue_properties properties, cl_int *errcode_ret)
+{
+    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateCommandQueue");
+    cl_queue_properties props[2] = { CL_QUEUE_PROPERTIES, properties };
+    return create_command_queue(context, device, props, errcode_ret);
+}
+
+static cl_command_queue clkp_clCreateCommandQueueWithProperties(
+    cl_context context, cl_device_id device, const cl_queue_properties *properties, cl_int *errcode_ret)
+{
+    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateCommandQueueWithProperties");
+    return create_command_queue(context, device, properties, errcode_ret);
 }
 
 /*****************************************************************************/
