@@ -8,3 +8,4 @@
 "name"
 "clReleaseCommandQueue"
 "clkp_wait"
+"clCreateCommandQueue-properties"
