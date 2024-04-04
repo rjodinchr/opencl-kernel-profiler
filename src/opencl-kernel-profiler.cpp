@@ -290,7 +290,7 @@ static cl_command_queue create_command_queue(
     if (properties) {
         for (unsigned i = 0; properties[i] != 0; i += 2) {
             cl_queue_properties key = properties[i];
-            cl_queue_properties val = properties[i];
+            cl_queue_properties val = properties[i + 1];
             if (key == CL_QUEUE_PROPERTIES) {
                 TRACE_EVENT_INSTANT(
                     CLKP_PERFETTO_CATEGORY, "clCreateCommandQueueWithProperties-properties", "properties", val);
