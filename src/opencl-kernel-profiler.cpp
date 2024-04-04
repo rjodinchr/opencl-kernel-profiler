@@ -327,7 +327,7 @@ static cl_command_queue clkp_clCreateCommandQueue(
     cl_context context, cl_device_id device, cl_command_queue_properties properties, cl_int *errcode_ret)
 {
     TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateCommandQueue");
-    cl_queue_properties props[3] = { CL_QUEUE_PROPERTIES, properties, 0 };
+    cl_queue_properties props[4] = { CL_QUEUE_PROPERTIES, properties, 0, 0 };
     return create_command_queue(context, device, props, errcode_ret);
 }
 
