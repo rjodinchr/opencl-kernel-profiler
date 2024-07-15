@@ -9,3 +9,4 @@
 "clReleaseCommandQueue"
 "clkp_wait"
 "clCreateCommandQueue-properties"
+"writeKernelOnDisk"

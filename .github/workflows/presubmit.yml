@@ -82,11 +82,13 @@ jobs:
           cmake --build build_release
       - name: Tests
         run: |
+          mkdir -p $(pwd)/kernels
           OCL_ICD_ENABLE_TRACE=1 \
           OPENCL_LAYERS=$(pwd)/build_release/libopencl-kernel-profiler.so \
           OCL_ICD_FILENAMES=$(pwd)/third_party/pocl/install/lib/libpocl.so \
           LD_LIBRARY_PATH=$(pwd)/third_party/opencl-icd-loader/build:$LD_LIBRARY_PATH \
           CLKP_TRACE_DEST=$(pwd)/trace \
+          CLKP_KERNEL_DIR=$(pwd)/kernels \
           $(pwd)/build_release/tests/opencl-kernel-profiler-test $(pwd)/tests/gpu.cl
           TRACE_PROCESSOR_SHELL=$(pwd)/third_party/perfetto/out/linux_clang_release/trace_processor_shell \
-          $(pwd)/tests/test.sh "$(pwd)/trace"
+          $(pwd)/tests/test.sh "$(pwd)/trace" "$(pwd)/kernels"

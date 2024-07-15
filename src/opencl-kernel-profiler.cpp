@@ -17,6 +17,7 @@
 #include <CL/cl_layer.h>
 #include <assert.h>
 #include <condition_variable>
+#include <filesystem>
 #include <fstream>
 #include <map>
 #include <mutex>
@@ -73,6 +74,29 @@ static const struct _cl_icd_dispatch *tdispatch;
 
 static std::mutex g_lock;
 
+static void writeKernelOnDisk(
+    const char *dir, std::string &program_name, cl_uint count, const char **strings, const size_t *lengths)
+{
+    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "writeKernelOnDisk", "dir", perfetto::DynamicString(dir), "program",
+        perfetto::DynamicString(program_name));
+    std::filesystem::path filename(dir);
+    if (!std::filesystem::exists(filename)) {
+        PRINT("'%s' does not exist, could not write kernel on disk", dir);
+        return;
+    }
+    filename /= program_name;
+    filename += ".cl";
+    FILE *file = fopen(filename.c_str(), "w");
+    for (unsigned i = 0; i < count; i++) {
+        size_t size_written = 0;
+        const uint8_t *data = (const uint8_t *)strings[i];
+        do {
+            size_written += fwrite(&data[size_written], 1, lengths[i] - size_written, file);
+        } while (size_written != lengths[i]);
+    }
+    fclose(file);
+}
+
 static uint32_t program_number = 0;
 static std::map<cl_program, std::string> program_to_string;
 static cl_program clkp_clCreateProgramWithSource(
@@ -82,6 +106,11 @@ static cl_program clkp_clCreateProgramWithSource(
     std::string program_str = std::string("clkp_p") + std::to_string(program_number++);
     TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateProgramWithSource", "program", perfetto::DynamicString(program_str),
         "count", count);
+
+    if (auto dir = getenv("CLKP_KERNEL_DIR")) {
+        writeKernelOnDisk(dir, program_str, count, strings, lengths);
+    }
+
     cl_program program = tdispatch->clCreateProgramWithSource(context, count, strings, lengths, errcode_ret);
     program_to_string[program] = program_str;
     for (unsigned i = 0; i < count; i++) {
