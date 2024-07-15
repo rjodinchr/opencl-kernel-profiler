@@ -67,6 +67,10 @@ Here is simple example to extract every kernel source code from the trace:
 echo "SELECT EXTRACT_ARG(arg_set_id, 'debug.string') FROM slice WHERE slice.name='clCreateProgramWithSource-args'" | ./trace_processor -q /dev/stdin <opencl-kernel-profiler.trace>
 ```
 
+# Extracting the kernel sources without perfetto
+
+Running an application without perfetto but with the opencl-kernel-profiler layer enabled will dump the kernel sources code inside the directory pointed by `CLKP_KERNEL_DIR`. If `CLKP_KERNEL_DIR` is not set, nothing get written on disk.
+
 # How does it work
 
 `opencl-kernel-profiler` intercept to following calls to generate perfetto traces:

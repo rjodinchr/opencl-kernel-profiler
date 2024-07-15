@@ -16,10 +16,11 @@
 
 set -xe
 
-[[ $# -eq 1 ]] || (echo "missing input trace file" && exit -1)
+[[ $# -eq 2 ]] || (echo "missing input trace file and/or kernels directory" && exit -1)
 
 SCRIPT_DIR="$(dirname $(realpath "${BASH_SOURCE[0]}"))"
 TRACE_FILE="$1"
+KERNELS_DIR="$2"
 OUTPUT_FILE="${SCRIPT_DIR}/output.txt"
 EXPECTATION_FILE="${SCRIPT_DIR}/trace-expectation.txt"
 EXPECTATION_SORTED_FILE="${SCRIPT_DIR}/trace-expectation.txt.sorted"
@@ -52,3 +53,4 @@ echo "SELECT EXTRACT_ARG(arg_set_id, 'debug.string') FROM slice WHERE slice.name
 cat "${OUTPUT_FILE}"
 grep -F "$(grep kernel ${GPU_SRC_FILE})" "${OUTPUT_FILE}"
 
+diff "${GPU_SRC_FILE}" "${KERNELS_DIR}/clkp_p0.cl"
