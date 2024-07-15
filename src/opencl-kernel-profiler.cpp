@@ -90,9 +90,10 @@ static void writeKernelOnDisk(
     for (unsigned i = 0; i < count; i++) {
         size_t size_written = 0;
         const uint8_t *data = (const uint8_t *)strings[i];
+        size_t code_size = lengths == nullptr ? strlen(strings[i]) : lengths[i];
         do {
-            size_written += fwrite(&data[size_written], 1, lengths[i] - size_written, file);
-        } while (size_written != lengths[i]);
+            size_written += fwrite(&data[size_written], 1, code_size - size_written, file);
+        } while (size_written != code_size);
     }
     fclose(file);
 }
