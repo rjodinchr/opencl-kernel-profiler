@@ -14,4 +14,5 @@
 
 add_executable(opencl-kernel-profiler-test host.c)
 target_include_directories(opencl-kernel-profiler-test PUBLIC ${OPENCL_HEADER_PATH})
+target_link_directories(opencl-kernel-profiler-test PUBLIC ${OPENCL_LIBRARY_PATH})
 target_link_libraries(opencl-kernel-profiler-test OpenCL)
