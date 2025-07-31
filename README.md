@@ -40,6 +40,7 @@ For real life examples, have a look at:
   * `System`: perfetto `traced` daemon will be responsible for generating the traces ([perfetto documentation](https://perfetto.dev/docs/instrumentation/tracing-sdk#system-mode)).
 * `TRACE_MAX_SIZE` (only with `InProcess` backend): Maximum size (in KB) of traces that can be recorded. Can be overriden at runtime using the following environment variable: `CLKP_TRACE_MAX_SIZE` (Default: `1024`).
 * `TRACE_DEST` (only with `InProcess` backend): File where the traces will be recorded. Can be overriden at runtime using the following environment variable: `CLKP_TRACE_DEST` (Default: `opencl-kernel-profiler.trace`).
+* `SPIRV_DISASSEMBLY` (optional): Enable SPIR-V disassembly in the traces. This option requires the [SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools) library
 
 # Running with OpenCL Kernel Profiler
 

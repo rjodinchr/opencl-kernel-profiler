@@ -30,9 +30,23 @@ if (NOT PERFETTO_LIBRARY)
   set(PERFETTO_LIBRARY perfetto)
 endif()
 
+option(SPIRV_DISASSEMBLY "Enable SPIR-V disassembly support" OFF)
+if (SPIRV_DISASSEMBLY)
+  find_library(SPIRV_TOOLS_LIBRARY NAMES SPIRV-Tools libSPIRV-Tools)
+  if (NOT SPIRV_TOOLS_LIBRARY)
+    message(FATAL_ERROR "SPIRV-Tools library not found")
+  endif()
+endif()
+
 add_library (opencl-kernel-profiler MODULE src/opencl-kernel-profiler.cpp)
 target_include_directories(opencl-kernel-profiler PUBLIC ${PERFETTO_SDK_PATH} ${OPENCL_HEADER_PATH})
-target_link_libraries(opencl-kernel-profiler ${PERFETTO_LIBRARY})
+
+if (SPIRV_DISASSEMBLY)
+  target_link_libraries(opencl-kernel-profiler ${PERFETTO_LIBRARY} ${SPIRV_TOOLS_LIBRARY})
+  target_compile_definitions(opencl-kernel-profiler PRIVATE SPIRV_DISASSEMBLY)
+else()
+  target_link_libraries(opencl-kernel-profiler ${PERFETTO_LIBRARY})
+endif()
 
 set(BACKEND "InProcess"
   CACHE STRING "Select perfetto backend")
