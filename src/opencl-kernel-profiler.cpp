@@ -142,6 +142,7 @@ struct callback_data {
     cl_kernel kernel;
     cl_event event;
     size_t gidX, gidY, gidZ;
+    int64_t time_offset;
 };
 
 struct ThreadInfo {
@@ -153,6 +154,7 @@ struct ThreadInfo {
 
 static std::map<cl_command_queue, ThreadInfo *> queue_to_thread_info;
 static std::map<cl_command_queue, std::thread> queue_to_thread;
+static std::map<cl_command_queue, int64_t> queue_to_time_offset;
 
 static void callback(cl_event event, cl_int event_command_exec_status, void *user_data)
 {
@@ -192,6 +194,7 @@ static void trace_callback(callback_data *data)
     cl_kernel kernel = data->kernel;
     cl_event event = data->event;
     size_t gidX = data->gidX, gidY = data->gidY, gidZ = data->gidZ;
+    int64_t time_offset = data->time_offset;
 
     cl_ulong start, end;
     cl_int err;
@@ -219,9 +222,9 @@ static void trace_callback(callback_data *data)
         + "." + std::to_string(gidZ);
 
     TRACE_EVENT_BEGIN(CLKP_PERFETTO_CATEGORY, perfetto::DynamicString(name), perfetto::Track((uintptr_t)queue),
-        (uint64_t)start, "program", perfetto::DynamicString(program_string), "kernel_name",
+        (uint64_t)(start + time_offset), "program", perfetto::DynamicString(program_string), "kernel_name",
         perfetto::DynamicString(kernel_name), "gidX", gidX, "gidY", gidY, "gidZ", gidZ);
-    TRACE_EVENT_END(CLKP_PERFETTO_CATEGORY, perfetto::Track((uintptr_t)queue), (uint64_t)end);
+    TRACE_EVENT_END(CLKP_PERFETTO_CATEGORY, perfetto::Track((uintptr_t)queue), (uint64_t)(end + time_offset));
 
     tdispatch->clReleaseEvent(event);
 }
@@ -279,6 +282,7 @@ static cl_int clkp_clEnqueueNDRangeKernel(cl_command_queue command_queue, cl_ker
     data->gidX = gidX;
     data->gidY = gidY;
     data->gidZ = gidZ;
+    data->time_offset = queue_to_time_offset[command_queue];
 
     cl_int err_cb = tdispatch->clSetEventCallback(*event, CL_COMPLETE, callback, data);
     CHECK_CL(err_cb, clean(); return err, "clSetEventCallback failed (%i)", err_cb);
@@ -348,6 +352,11 @@ static cl_command_queue create_command_queue(
     thread_info->stop = false;
     queue_to_thread_info[command_queue] = thread_info;
     queue_to_thread.emplace(command_queue, [thread_info] { queue_thread_function(thread_info); });
+
+    cl_ulong device_timestamp, host_timestamp;
+    tdispatch->clGetDeviceAndHostTimer(device, &device_timestamp, &host_timestamp);
+    uint64_t perfetto_timestamp = perfetto::TrackEvent::GetTraceTimeNs();
+    queue_to_time_offset[command_queue] = perfetto_timestamp - device_timestamp;
 
     return command_queue;
 }
