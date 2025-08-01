@@ -136,10 +136,10 @@ static void writeILOnDisk(
         return;
     }
 
-    // Write the raw SPIR-V binary
-    std::filesystem::path spv_filename = base_path / program_name;
-    spv_filename += ".spv";
-    FILE *file = fopen(spv_filename.c_str(), "wb");
+    // Write the raw IL binary
+    std::filesystem::path il_filename = base_path / program_name;
+    il_filename += ".il";
+    FILE *file = fopen(il_filename.c_str(), "wb");
     if (file) {
         size_t size_written = 0;
         const uint8_t *data = (const uint8_t *)il;
