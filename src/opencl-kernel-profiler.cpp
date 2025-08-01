@@ -104,7 +104,7 @@ static void writeKernelOnDisk(
 #ifdef SPIRV_DISASSEMBLY
 static std::string disassembleSpirv(const void *il, size_t length, const std::string &program_name)
 {
-    const uint32_t* spirv_data = (const uint32_t *)(il);
+    const uint32_t *spirv_data = (const uint32_t *)(il);
     size_t spirv_words = length / sizeof(uint32_t);
 
     spvtools::SpirvTools tools(SPV_ENV_OPENCL_2_2);
@@ -119,7 +119,8 @@ static std::string disassembleSpirv(const void *il, size_t length, const std::st
 }
 #endif
 
-static void writeSpirvOnDisk(const char *dir, std::string &program_name, const void *il, size_t length, const std::string &disassembly)
+static void writeSpirvOnDisk(
+    const char *dir, std::string &program_name, const void *il, size_t length, const std::string &disassembly)
 {
     TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "writeSpirvOnDisk", "dir", perfetto::DynamicString(dir), "program",
         perfetto::DynamicString(program_name));
@@ -183,14 +184,13 @@ static cl_program clkp_clCreateProgramWithSource(
     return program;
 }
 
-static cl_program clkp_clCreateProgramWithIL(
-    cl_context context, const void *il, size_t length, cl_int *errcode_ret)
+static cl_program clkp_clCreateProgramWithIL(cl_context context, const void *il, size_t length, cl_int *errcode_ret)
 {
     std::lock_guard<std::mutex> lock(g_lock);
     std::string program_str = std::string("clkp_p") + std::to_string(program_number++);
 
-    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateProgramWithIL", "program", perfetto::DynamicString(program_str.c_str()),
-        "length", length);
+    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateProgramWithIL", "program",
+        perfetto::DynamicString(program_str.c_str()), "length", length);
 
     std::string disassembly;
 #ifdef SPIRV_DISASSEMBLY
