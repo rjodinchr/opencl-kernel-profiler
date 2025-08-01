@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define CL_TARGET_OPENCL_VERSION 120
+#define CL_TARGET_OPENCL_VERSION 220
 #include <CL/cl.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -48,6 +48,36 @@ void vector_inc(
     clReleaseContext(context);
 }
 
+void vector_inc_spirv(
+    size_t buffer_size, void *buffer, const void *spirv_binary, size_t spirv_size, const size_t *global_work_size)
+{
+    // Initialization
+    cl_platform_id platform;
+    cl_device_id device;
+    clGetPlatformIDs(1, &platform, NULL);
+    clGetDeviceIDs(platform, CL_DEVICE_TYPE_DEFAULT, 1, &device, NULL);
+    cl_context context = clCreateContext(NULL, 1, &device, NULL, NULL, NULL);
+    cl_command_queue command_queue = clCreateCommandQueue(context, device, 0, NULL);
+
+    // Create buffer & kernel from SPIR-V binary
+    cl_program program = clCreateProgramWithIL(context, spirv_binary, spirv_size, NULL);
+    clBuildProgram(program, 1, &device, NULL, NULL, NULL);
+    cl_kernel kernel = clCreateKernel(program, "inc", NULL);
+    cl_mem cl_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, buffer_size, NULL, NULL);
+    clSetKernelArg(kernel, 0, sizeof(cl_mem), &cl_buffer);
+
+    // Write buffer to device, execute kernel and read buffer from device
+    clEnqueueWriteBuffer(command_queue, cl_buffer, CL_BLOCKING, 0, buffer_size, buffer, 0, NULL, NULL);
+    clEnqueueNDRangeKernel(command_queue, kernel, 1, NULL, global_work_size, NULL, 0, NULL, NULL);
+    clEnqueueReadBuffer(command_queue, cl_buffer, CL_BLOCKING, 0, buffer_size, buffer, 0, NULL, NULL);
+
+    clReleaseMemObject(cl_buffer);
+    clReleaseKernel(kernel);
+    clReleaseProgram(program);
+    clReleaseCommandQueue(command_queue);
+    clReleaseContext(context);
+}
+
 #define NB_ELEM 1024
 
 int main(int argc, char **argv)
@@ -62,11 +92,16 @@ int main(int argc, char **argv)
     size_t global_work_size = NB_ELEM;
 
     if (argc != 2) {
-        fprintf(stderr, "1 argument (and only one) is expected. It should be the path to the kernel source code\n");
+        fprintf(stderr, "1 argument (and only one) is expected. It should be the path to the kernel source code or SPIR-V binary\n");
         return -2;
     }
 
-    FILE *f_source = fopen(argv[1], "r");
+    FILE *f_source = fopen(argv[1], "rb");  // Open in binary mode to support both text and binary
+    if (!f_source) {
+        fprintf(stderr, "Failed to open file: %s\n", argv[1]);
+        return -2;
+    }
+
     fseek(f_source, 0, SEEK_END);
     const size_t source_length = ftell(f_source);
     fseek(f_source, 0, SEEK_SET);
@@ -77,7 +112,17 @@ int main(int argc, char **argv)
     } while (size_read != source_length);
     fclose(f_source);
 
-    vector_inc(sizeof(buffer), buffer, (const char **)&source, &source_length, &global_work_size);
+    // Check if file is SPIR-V binary (starts with SPIR-V magic number 0x07230203)
+    bool is_spirv = (source_length >= 4) &&
+                    (((uint32_t*)source)[0] == 0x07230203);
+
+    if (is_spirv) {
+        printf("Using SPIR-V binary\n");
+        vector_inc_spirv(sizeof(buffer), buffer, source, source_length, &global_work_size);
+    } else {
+        printf("Using OpenCL C source\n");
+        vector_inc(sizeof(buffer), buffer, (const char **)&source, &source_length, &global_work_size);
+    }
 
     bool success = true;
     for (unsigned i = 0; i < NB_ELEM; i++) {
@@ -87,6 +132,7 @@ int main(int argc, char **argv)
         }
     }
 
+    free(source);
     printf("OpenCL application completed!\n");
     return success ? 0 : -1;
 }

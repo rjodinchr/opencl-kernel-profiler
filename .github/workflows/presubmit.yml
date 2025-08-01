@@ -53,6 +53,17 @@ jobs:
       - name: Install pocl dependencies
         run: |
           sudo apt-get install -y python3-dev libpython3-dev build-essential ocl-icd-libopencl1 cmake git pkg-config libclang-15-dev clang-15 llvm-15 make ninja-build ocl-icd-libopencl1 ocl-icd-dev ocl-icd-opencl-dev libhwloc-dev zlib1g zlib1g-dev clinfo dialog apt-utils libxml2-dev libclang-cpp15-dev libclang-cpp15 llvm-15-dev
+      - name: Build SPIRV-Tools
+        run: |
+          git clone --depth 1 --branch v2025.1 https://github.com/KhronosGroup/SPIRV-Tools.git third_party/spirv-tools
+          python3 third_party/spirv-tools/utils/git-sync-deps
+          cmake -B third_party/spirv-tools/build -S third_party/spirv-tools -G Ninja \
+            -DCMAKE_INSTALL_PREFIX=$(pwd)/third_party/spirv-tools/install \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER="$(which clang++)" \
+            -DCMAKE_C_COMPILER="$(which clang)" \
+            -DSPIRV_SKIP_TESTS=ON
+          cmake --build third_party/spirv-tools/build --target install
       - name: Build pocl
         run: |
           git clone --depth 1 --branch v6.0 https://github.com/pocl/pocl.git third_party/pocl
@@ -78,17 +89,32 @@ jobs:
             -DCMAKE_CXX_COMPILER="$(which clang++)" \
             -DCMAKE_C_COMPILER="$(which clang)" \
             -DCLKP_BUILD_TESTS=1 \
-            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSPIRV_DISASSEMBLY=ON \
+            -DCMAKE_PREFIX_PATH="$(pwd)/third_party/spirv-tools/install"
           cmake --build build_release
       - name: Tests
         run: |
           mkdir -p $(pwd)/kernels
+          echo "Testing with OpenCL C source (.cl file):"
           OCL_ICD_ENABLE_TRACE=1 \
           OPENCL_LAYERS=$(pwd)/build_release/libopencl-kernel-profiler.so \
           OCL_ICD_FILENAMES=$(pwd)/third_party/pocl/install/lib/libpocl.so \
           LD_LIBRARY_PATH=$(pwd)/third_party/opencl-icd-loader/build:$LD_LIBRARY_PATH \
-          CLKP_TRACE_DEST=$(pwd)/trace \
+          CLKP_TRACE_DEST=$(pwd)/trace_cl \
           CLKP_KERNEL_DIR=$(pwd)/kernels \
           $(pwd)/build_release/tests/opencl-kernel-profiler-test $(pwd)/tests/gpu.cl
           TRACE_PROCESSOR_SHELL=$(pwd)/third_party/perfetto/out/linux_clang_release/trace_processor_shell \
-          $(pwd)/tests/test.sh "$(pwd)/trace" "$(pwd)/kernels"
+          $(pwd)/tests/test.sh "$(pwd)/trace_cl" "$(pwd)/kernels" "cl"
+
+          echo "Testing with SPIR-V binary (.spv file):"
+          rm -rf $(pwd)/kernels/*
+          OCL_ICD_ENABLE_TRACE=1 \
+          OPENCL_LAYERS=$(pwd)/build_release/libopencl-kernel-profiler.so \
+          OCL_ICD_FILENAMES=$(pwd)/third_party/pocl/install/lib/libpocl.so \
+          LD_LIBRARY_PATH=$(pwd)/third_party/opencl-icd-loader/build:$LD_LIBRARY_PATH \
+          CLKP_TRACE_DEST=$(pwd)/trace_spv \
+          CLKP_KERNEL_DIR=$(pwd)/kernels \
+          $(pwd)/build_release/tests/opencl-kernel-profiler-test $(pwd)/tests/gpu.spv
+          TRACE_PROCESSOR_SHELL=$(pwd)/third_party/perfetto/out/linux_clang_release/trace_processor_shell \
+          $(pwd)/tests/test.sh "$(pwd)/trace_spv" "$(pwd)/kernels" "spv"
