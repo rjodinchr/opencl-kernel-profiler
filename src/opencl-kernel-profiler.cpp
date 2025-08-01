@@ -107,6 +107,11 @@ static std::string disassembleSpirv(const void *il, size_t length, const std::st
     const uint32_t *spirv_data = (const uint32_t *)(il);
     size_t spirv_words = length / sizeof(uint32_t);
 
+    // Check for SPIR-V magic number
+    if (spirv_words == 0 || *spirv_data != 0x07230203) {
+        return "";
+    }
+
     spvtools::SpirvTools tools(SPV_ENV_OPENCL_2_2);
     std::string disassembly;
 
@@ -119,10 +124,10 @@ static std::string disassembleSpirv(const void *il, size_t length, const std::st
 }
 #endif
 
-static void writeSpirvOnDisk(
+static void writeILOnDisk(
     const char *dir, std::string &program_name, const void *il, size_t length, const std::string &disassembly)
 {
-    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "writeSpirvOnDisk", "dir", perfetto::DynamicString(dir), "program",
+    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "writeILOnDisk", "dir", perfetto::DynamicString(dir), "program",
         perfetto::DynamicString(program_name));
 
     std::filesystem::path base_path(dir);
@@ -202,7 +207,7 @@ static cl_program clkp_clCreateProgramWithIL(cl_context context, const void *il,
 #endif
 
     if (auto dir = getenv("CLKP_KERNEL_DIR")) {
-        writeSpirvOnDisk(dir, program_str, il, length, disassembly);
+        writeILOnDisk(dir, program_str, il, length, disassembly);
     }
 
     cl_program program = tdispatch->clCreateProgramWithIL(context, il, length, errcode_ret);
