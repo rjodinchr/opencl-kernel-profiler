@@ -78,6 +78,8 @@ int main(int argc, char **argv)
         return -2;
     }
 
+    bool success = true;
+
     // Process each file argument
     for (int file_idx = 1; file_idx < argc; file_idx++) {
         printf("Processing file: %s\n", argv[file_idx]);
@@ -100,7 +102,6 @@ int main(int argc, char **argv)
 
         vector_inc(sizeof(buffer), buffer, (const char **)&source, &source_length, &global_work_size);
 
-        bool success = true;
         for (unsigned i = 0; i < NB_ELEM; i++) {
             if (buffer[i] != i + 43) {
                 fprintf(stderr, "[%u] Error in kernel execution: expected %u got %u\n", i, 43 + i, buffer[i]);
@@ -109,10 +110,6 @@ int main(int argc, char **argv)
         }
 
         free(source);
-
-        if (!success) {
-            return -1;
-        }
 
         // Reset buffer for next test
         for (unsigned i = 0; i < NB_ELEM; i++) {
