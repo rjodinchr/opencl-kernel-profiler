@@ -92,11 +92,13 @@ int main(int argc, char **argv)
     size_t global_work_size = NB_ELEM;
 
     if (argc != 2) {
-        fprintf(stderr, "1 argument (and only one) is expected. It should be the path to the kernel source code or SPIR-V binary\n");
+        fprintf(stderr,
+            "1 argument (and only one) is expected. It should be the path to the kernel source code or SPIR-V "
+            "binary\n");
         return -2;
     }
 
-    FILE *f_source = fopen(argv[1], "rb");  // Open in binary mode to support both text and binary
+    FILE *f_source = fopen(argv[1], "rb"); // Open in binary mode to support both text and binary
     if (!f_source) {
         fprintf(stderr, "Failed to open file: %s\n", argv[1]);
         return -2;
@@ -113,8 +115,7 @@ int main(int argc, char **argv)
     fclose(f_source);
 
     // Check if file is SPIR-V binary (starts with SPIR-V magic number 0x07230203)
-    bool is_spirv = (source_length >= 4) &&
-                    (((uint32_t*)source)[0] == 0x07230203);
+    bool is_spirv = (source_length >= 4) && (((uint32_t *)source)[0] == 0x07230203);
 
     if (is_spirv) {
         printf("Using SPIR-V binary\n");
