@@ -1,0 +1,45 @@
+OpCapability Addresses
+OpCapability Linkage
+OpCapability Kernel
+OpCapability Int64
+%1 = OpExtInstImport "OpenCL.std"
+OpMemoryModel Physical64 OpenCL
+OpEntryPoint Kernel %19 "inc" %__spirv_BuiltInGlobalInvocationId
+OpSource OpenCL_C 102000
+OpName %__spirv_BuiltInGlobalInvocationId "__spirv_BuiltInGlobalInvocationId"
+OpName %inc "inc"
+OpDecorate %__spirv_BuiltInGlobalInvocationId LinkageAttributes "__spirv_BuiltInGlobalInvocationId" Import
+OpDecorate %__spirv_BuiltInGlobalInvocationId Constant
+OpDecorate %__spirv_BuiltInGlobalInvocationId BuiltIn GlobalInvocationId
+OpDecorate %inc LinkageAttributes "inc" Export
+OpDecorate %11 FuncParamAttr NoCapture
+OpDecorate %11 Alignment 4
+OpDecorate %18 NoSignedWrap
+OpDecorate %20 FuncParamAttr NoCapture
+OpDecorate %20 Alignment 4
+%ulong = OpTypeInt 64 0
+%uint = OpTypeInt 32 0
+%uint_1 = OpConstant %uint 1
+%v3ulong = OpTypeVector %ulong 3
+%_ptr_Input_v3ulong = OpTypePointer Input %v3ulong
+%void = OpTypeVoid
+%_ptr_CrossWorkgroup_uint = OpTypePointer CrossWorkgroup %uint
+%9 = OpTypeFunction %void %_ptr_CrossWorkgroup_uint
+%__spirv_BuiltInGlobalInvocationId = OpVariable %_ptr_Input_v3ulong Input
+%inc = OpFunction %void None %9
+%11 = OpFunctionParameter %_ptr_CrossWorkgroup_uint
+%12 = OpLabel
+%13 = OpLoad %v3ulong %__spirv_BuiltInGlobalInvocationId Aligned 32
+%14 = OpCompositeExtract %ulong %13 0
+%15 = OpInBoundsPtrAccessChain %_ptr_CrossWorkgroup_uint %11 %14
+%16 = OpLoad %uint %15 Aligned 4
+%18 = OpIAdd %uint %16 %uint_1
+OpStore %15 %18 Aligned 4
+OpReturn
+OpFunctionEnd
+%19 = OpFunction %void None %9
+%20 = OpFunctionParameter %_ptr_CrossWorkgroup_uint
+%21 = OpLabel
+%22 = OpFunctionCall %void %inc %20
+OpReturn
+OpFunctionEnd
