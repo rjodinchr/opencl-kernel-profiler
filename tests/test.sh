@@ -42,7 +42,7 @@ function clean() {
 trap clean EXIT
 
 mkdir -p "${KERNELS_DIR}"
-spirv-as "${GPU_SRC_SPVASM_FILE}" -o "${GPU_SPV_FILE}"
+spirv-as "${GPU_SRC_SPVASM_FILE}" -o "${GPU_SPV_FILE}" --target-env spv1.4
 spirv-dis --no-header --no-indent "${GPU_SPV_FILE}" -o "${GPU_SPVASM_FILE}"
 
 CLKP_TRACE_DEST="${TMP_DIR}/trace" CLKP_KERNEL_DIR="${TMP_DIR}/kernels" "${CLKP_HOST_TEST}" "${GPU_SRC_FILE}" "${GPU_SPV_FILE}"
