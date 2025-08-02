@@ -69,7 +69,7 @@ int main(int argc, char **argv)
     clGetPlatformIDs(1, &platform, NULL);
     clGetDeviceIDs(platform, CL_DEVICE_TYPE_DEFAULT, 1, &device, NULL);
     cl_context context = clCreateContext(NULL, 1, &device, NULL, NULL, NULL);
-    cl_command_queue command_queue = clCreateCommandQueue(context, device, 0, NULL);
+    cl_command_queue command_queue = clCreateCommandQueueWithProperties(context, device, NULL, NULL);
 
     char platform_name[512];
     clGetPlatformInfo(platform, CL_PLATFORM_NAME, sizeof(platform_name), platform_name, NULL);
