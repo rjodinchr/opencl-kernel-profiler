@@ -33,6 +33,7 @@ TRACE_FILE="${TMP_DIR}/trace"
 OUTPUT_FILE="${TMP_DIR}/output.txt"
 EXPECTATION_SORTED_FILE="${TMP_DIR}/trace-expectation.sorted"
 GPU_SPV_FILE="${TMP_DIR}/gpu.spv"
+GPU_SPVASM_FILE="${TMP_DIR}/gpu.spvasm"
 
 function clean() {
     tree "${TMP_DIR}"
@@ -42,6 +43,7 @@ trap clean EXIT
 
 mkdir -p "${KERNELS_DIR}"
 spirv-as "${GPU_SRC_SPVASM_FILE}" -o "${GPU_SPV_FILE}"
+spirv-dis --no-header --no-indent "${GPU_SPV_FILE}" -o "${GPU_SPVASM_FILE}"
 
 CLKP_TRACE_DEST="${TMP_DIR}/trace" CLKP_KERNEL_DIR="${TMP_DIR}/kernels" "${CLKP_HOST_TEST}" "${GPU_SRC_FILE}" "${GPU_SPV_FILE}"
 
@@ -61,7 +63,6 @@ diff "${OUTPUT_FILE}" "${EXPECTATION_SORTED_FILE}"
 echo "SELECT EXTRACT_ARG(arg_set_id, 'debug.string') FROM slice WHERE slice.name='clCreateProgramWithSource-args'" \
     | "${TRACE_PROCESSOR_SHELL}" -q /dev/stdin "${TRACE_FILE}" \
                                  > "${OUTPUT_FILE}"
-
 cat "${OUTPUT_FILE}"
 grep -F "$(grep kernel ${GPU_SRC_FILE})" "${OUTPUT_FILE}"
 
@@ -70,6 +71,7 @@ diff "${GPU_SRC_FILE}" "${KERNELS_DIR}/clkp_p0.cl"
 echo "SELECT EXTRACT_ARG(arg_set_id, 'debug.disassembly') FROM slice WHERE slice.name='clCreateProgramWithIL-args'" \
     | "${TRACE_PROCESSOR_SHELL}" -q /dev/stdin "${TRACE_FILE}" \
                                  > "${OUTPUT_FILE}"
-
 cat "${OUTPUT_FILE}"
 grep -F "OpName %inc \"inc\"" ${OUTPUT_FILE}
+
+diff "${GPU_SPVASM_FILE}" "${KERNELS_DIR}/clkp_p1.spvasm"
