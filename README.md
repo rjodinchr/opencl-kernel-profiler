@@ -40,6 +40,7 @@ For real life examples, have a look at:
   * `System`: perfetto `traced` daemon will be responsible for generating the traces ([perfetto documentation](https://perfetto.dev/docs/instrumentation/tracing-sdk#system-mode)).
 * `TRACE_MAX_SIZE` (only with `InProcess` backend): Maximum size (in KB) of traces that can be recorded. Can be overriden at runtime using the following environment variable: `CLKP_TRACE_MAX_SIZE` (Default: `1024`).
 * `TRACE_DEST` (only with `InProcess` backend): File where the traces will be recorded. Can be overriden at runtime using the following environment variable: `CLKP_TRACE_DEST` (Default: `opencl-kernel-profiler.trace`).
+* `SPIRV_DISASSEMBLY` (optional): Enable SPIR-V disassembly in the traces. This option requires the [SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools) library
 
 # Running with OpenCL Kernel Profiler
 
@@ -78,6 +79,7 @@ Running an application without perfetto but with the opencl-kernel-profiler laye
 * `clCreateCommandQueue`: it modifies `properties` to enable profiling (`CL_QUEUE_PROFILING_ENABLE`).
 * `clCreateCommandQueueWithProperties`: it adds `CL_QUEUE_PROPERTIES` with `CL_QUEUE_PROFILING_ENABLE`, or just set `CL_QUEUE_PROFILING_ENABLE` if `CL_QUEUE_PROPERTIES` is already set.
 * `clCreateProgramWithSource`: it creates instant traces with the program source strings and initializes internal structures.
+* `clCreateProgramWithIL`: it initializes internal structures. If SPIRV-V disassembly is supported and the program is SPIRV-V, it also creates instant traces with the program SPIRV-V disassembly.
 * `clCreateKernel`: it initializes internal structures.
 * `clEnqueueNDRangekernel`: it creates a callback on the kernel completion. The callback will create traces with the proper timestamp for the kernel using timestamp coming from `clGetEventProfilinginfo`.
 

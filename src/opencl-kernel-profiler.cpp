@@ -28,6 +28,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <thread>
+#ifdef SPIRV_DISASSEMBLY
+#include <spirv-tools/libspirv.hpp>
+#endif
 
 /*****************************************************************************/
 /* PERFETTO GLOBAL VARIABLES *************************************************/
@@ -98,6 +101,71 @@ static void writeKernelOnDisk(
     fclose(file);
 }
 
+#ifdef SPIRV_DISASSEMBLY
+static std::string disassembleSpirv(const void *il, size_t length, const std::string &program_name)
+{
+    const uint32_t *spirv_data = (const uint32_t *)(il);
+    size_t spirv_words = length / sizeof(uint32_t);
+
+    // Check for SPIR-V magic number
+    if (spirv_words == 0 || *spirv_data != 0x07230203) {
+        return "";
+    }
+
+    spvtools::SpirvTools tools(SPV_ENV_OPENCL_2_2);
+    std::string disassembly;
+
+    if (tools.Disassemble(spirv_data, spirv_words, &disassembly)) {
+        return disassembly;
+    } else {
+        PRINT("Failed to disassemble SPIR-V for program %s", program_name.c_str());
+        return "";
+    }
+}
+#endif
+
+static void writeILOnDisk(
+    const char *dir, std::string &program_name, const void *il, size_t length, const std::string &disassembly)
+{
+    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "writeILOnDisk", "dir", perfetto::DynamicString(dir), "program",
+        perfetto::DynamicString(program_name));
+
+    std::filesystem::path base_path(dir);
+    if (!std::filesystem::exists(base_path)) {
+        PRINT("'%s' does not exist, could not write SPIR-V on disk", dir);
+        return;
+    }
+
+    // Write the raw IL binary
+    std::filesystem::path il_filename = base_path / program_name;
+    il_filename += ".il";
+    FILE *file = fopen(il_filename.c_str(), "wb");
+    if (file) {
+        size_t size_written = 0;
+        const uint8_t *data = (const uint8_t *)il;
+        do {
+            size_written += fwrite(&data[size_written], 1, length - size_written, file);
+        } while (size_written != length);
+        fclose(file);
+    }
+
+    // Write the disassembly if provided
+    if (!disassembly.empty()) {
+        std::filesystem::path asm_filename = base_path / program_name;
+        asm_filename += ".spvasm";
+        FILE *asm_file = fopen(asm_filename.c_str(), "w");
+        if (asm_file) {
+            size_t size_written = 0;
+            const uint8_t *data = (const uint8_t *)disassembly.c_str();
+            size_t code_size = disassembly.length();
+            do {
+                size_written += fwrite(&data[size_written], 1, code_size - size_written, asm_file);
+            } while (size_written != code_size);
+            fclose(asm_file);
+        }
+    }
+}
+
 static uint32_t program_number = 0;
 static std::map<cl_program, std::string> program_to_string;
 static cl_program clkp_clCreateProgramWithSource(
@@ -118,6 +186,33 @@ static cl_program clkp_clCreateProgramWithSource(
         TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY, "clCreateProgramWithSource-args", "program",
             perfetto::DynamicString(program_str), "string", perfetto::DynamicString(strings[i]));
     }
+    return program;
+}
+
+static cl_program clkp_clCreateProgramWithIL(cl_context context, const void *il, size_t length, cl_int *errcode_ret)
+{
+    std::lock_guard<std::mutex> lock(g_lock);
+    std::string program_str = std::string("clkp_p") + std::to_string(program_number++);
+
+    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateProgramWithIL", "program",
+        perfetto::DynamicString(program_str.c_str()), "length", length);
+
+    std::string disassembly;
+#ifdef SPIRV_DISASSEMBLY
+    disassembly = disassembleSpirv(il, length, program_str);
+    if (!disassembly.empty()) {
+        TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY, "clCreateProgramWithIL-args", "program",
+            perfetto::DynamicString(program_str), "disassembly", perfetto::DynamicString(disassembly));
+    }
+#endif
+
+    if (auto dir = getenv("CLKP_KERNEL_DIR")) {
+        writeILOnDisk(dir, program_str, il, length, disassembly);
+    }
+
+    cl_program program = tdispatch->clCreateProgramWithIL(context, il, length, errcode_ret);
+    program_to_string[program] = program_str;
+
     return program;
 }
 
@@ -478,6 +573,7 @@ CL_API_ENTRY cl_int CL_API_CALL clInitLayer(cl_uint num_entries, const struct _c
 
     memset(&dispatch, 0, sizeof(dispatch));
     dispatch.clCreateProgramWithSource = clkp_clCreateProgramWithSource;
+    dispatch.clCreateProgramWithIL = clkp_clCreateProgramWithIL;
     dispatch.clCreateKernel = clkp_clCreateKernel;
     dispatch.clEnqueueNDRangeKernel = clkp_clEnqueueNDRangeKernel;
     dispatch.clCreateCommandQueue = clkp_clCreateCommandQueue;

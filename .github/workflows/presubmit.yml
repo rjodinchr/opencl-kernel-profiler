@@ -52,7 +52,7 @@ jobs:
           cmake --build third_party/opencl-icd-loader/build
       - name: Install pocl dependencies
         run: |
-          sudo apt-get install -y python3-dev libpython3-dev build-essential ocl-icd-libopencl1 cmake git pkg-config libclang-15-dev clang-15 llvm-15 make ninja-build ocl-icd-libopencl1 ocl-icd-dev ocl-icd-opencl-dev libhwloc-dev zlib1g zlib1g-dev clinfo dialog apt-utils libxml2-dev libclang-cpp15-dev libclang-cpp15 llvm-15-dev
+          sudo apt-get install -y python3-dev libpython3-dev build-essential ocl-icd-libopencl1 cmake git pkg-config libclang-15-dev clang-15 llvm-15 make ninja-build ocl-icd-libopencl1 ocl-icd-dev ocl-icd-opencl-dev libhwloc-dev zlib1g zlib1g-dev clinfo dialog apt-utils libxml2-dev libclang-cpp15-dev libclang-cpp15 llvm-15-dev llvm-spirv-15
       - name: Build pocl
         run: |
           git clone --depth 1 --branch v6.0 https://github.com/pocl/pocl.git third_party/pocl
@@ -62,6 +62,17 @@ jobs:
             -DCMAKE_CXX_COMPILER="$(which clang++)" \
             -DCMAKE_C_COMPILER="$(which clang)"
           cmake --build third_party/pocl/build --target install
+      - name: Build SPIRV-Tools
+        run: |
+          git clone --depth 1 --branch main https://github.com/KhronosGroup/SPIRV-Tools.git third_party/spirv-tools
+          git clone --depth 1 --branch main https://github.com/KhronosGroup/SPIRV-Headers.git third_party/spirv-tools/external/spirv-headers
+          cmake -B third_party/spirv-tools/build -S third_party/spirv-tools -G Ninja \
+            -DCMAKE_INSTALL_PREFIX=$(pwd)/third_party/spirv-tools/install \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER="$(which clang++)" \
+            -DCMAKE_C_COMPILER="$(which clang)" \
+            -DSPIRV_SKIP_TESTS=ON
+          cmake --build third_party/spirv-tools/build --target install
       - name: Build debug
         run: |
           cmake -B build_debug -S . -G Ninja \
@@ -78,17 +89,17 @@ jobs:
             -DCMAKE_CXX_COMPILER="$(which clang++)" \
             -DCMAKE_C_COMPILER="$(which clang)" \
             -DCLKP_BUILD_TESTS=1 \
-            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSPIRV_DISASSEMBLY=ON \
+            -DCMAKE_PREFIX_PATH="$(pwd)/third_party/spirv-tools/install"
           cmake --build build_release
       - name: Tests
+        env:
+          OPENCL_LAYERS: ${{ github.workspace }}/build_release/libopencl-kernel-profiler.so
+          OCL_ICD_ENABLE_TRACE: 1
+          OCL_ICD_FILENAMES: ${{ github.workspace }}/third_party/pocl/install/lib/libpocl.so
+          TRACE_PROCESSOR_SHELL: ${{ github.workspace }}/third_party/perfetto/out/linux_clang_release/trace_processor_shell
         run: |
-          mkdir -p $(pwd)/kernels
-          OCL_ICD_ENABLE_TRACE=1 \
-          OPENCL_LAYERS=$(pwd)/build_release/libopencl-kernel-profiler.so \
-          OCL_ICD_FILENAMES=$(pwd)/third_party/pocl/install/lib/libpocl.so \
+          PATH=$(pwd)/third_party/spirv-tools/install/bin:$PATH \
           LD_LIBRARY_PATH=$(pwd)/third_party/opencl-icd-loader/build:$LD_LIBRARY_PATH \
-          CLKP_TRACE_DEST=$(pwd)/trace \
-          CLKP_KERNEL_DIR=$(pwd)/kernels \
-          $(pwd)/build_release/tests/opencl-kernel-profiler-test $(pwd)/tests/gpu.cl
-          TRACE_PROCESSOR_SHELL=$(pwd)/third_party/perfetto/out/linux_clang_release/trace_processor_shell \
-          $(pwd)/tests/test.sh "$(pwd)/trace" "$(pwd)/kernels"
+          $(pwd)/tests/test.sh "$(pwd)/build_release/tests/opencl-kernel-profiler-test"

@@ -16,23 +16,36 @@
 
 set -xe
 
-[[ $# -eq 2 ]] || (echo "missing input trace file and/or kernels directory" && exit -1)
+[[ $# -eq 1 ]] || (echo "missing input 'opencl-kernel-profiler-test'" && exit -1)
 
 SCRIPT_DIR="$(dirname $(realpath "${BASH_SOURCE[0]}"))"
-TRACE_FILE="$1"
-KERNELS_DIR="$2"
-OUTPUT_FILE="${SCRIPT_DIR}/output.txt"
+CLKP_HOST_TEST="$1"
 EXPECTATION_FILE="${SCRIPT_DIR}/trace-expectation.txt"
-EXPECTATION_SORTED_FILE="${SCRIPT_DIR}/trace-expectation.txt.sorted"
 GPU_SRC_FILE="${SCRIPT_DIR}/gpu.cl"
+GPU_SRC_SPVASM_FILE="${SCRIPT_DIR}/gpu.spvasm"
 
 # Either it is in your path, or you need to define the environment variable
 TRACE_PROCESSOR_SHELL=${TRACE_PROCESSOR_SHELL:-"trace_processor_shell"}
 
+TMP_DIR="$(mktemp -d)"
+KERNELS_DIR="${TMP_DIR}/kernels"
+TRACE_FILE="${TMP_DIR}/trace"
+OUTPUT_FILE="${TMP_DIR}/output.txt"
+EXPECTATION_SORTED_FILE="${TMP_DIR}/trace-expectation.sorted"
+GPU_SPV_FILE="${TMP_DIR}/gpu.spv"
+GPU_SPVASM_FILE="${TMP_DIR}/gpu.spvasm"
+
 function clean() {
-    rm -f "${OUTPUT_FILE}" "${EXPECTATION_SORTED_FILE}"
+    tree "${TMP_DIR}"
+    rm -rf "${TMP_DIR}"
 }
 trap clean EXIT
+
+mkdir -p "${KERNELS_DIR}"
+spirv-as "${GPU_SRC_SPVASM_FILE}" -o "${GPU_SPV_FILE}" --target-env spv1.4
+spirv-dis --no-header --no-indent "${GPU_SPV_FILE}" -o "${GPU_SPVASM_FILE}"
+
+CLKP_TRACE_DEST="${TMP_DIR}/trace" CLKP_KERNEL_DIR="${TMP_DIR}/kernels" "${CLKP_HOST_TEST}" "${GPU_SRC_FILE}" "${GPU_SPV_FILE}"
 
 echo "SELECT name FROM slice WHERE slice.category='clkp'" \
     | "${TRACE_PROCESSOR_SHELL}" -q /dev/stdin "${TRACE_FILE}" \
@@ -54,3 +67,11 @@ cat "${OUTPUT_FILE}"
 grep -F "$(grep kernel ${GPU_SRC_FILE})" "${OUTPUT_FILE}"
 
 diff "${GPU_SRC_FILE}" "${KERNELS_DIR}/clkp_p0.cl"
+
+echo "SELECT EXTRACT_ARG(arg_set_id, 'debug.disassembly') FROM slice WHERE slice.name='clCreateProgramWithIL-args'" \
+    | "${TRACE_PROCESSOR_SHELL}" -q /dev/stdin "${TRACE_FILE}" \
+                                 > "${OUTPUT_FILE}"
+cat "${OUTPUT_FILE}"
+grep -F "OpName %inc \"inc\"" ${OUTPUT_FILE}
+
+diff "${GPU_SPVASM_FILE}" "${KERNELS_DIR}/clkp_p1.spvasm"
