@@ -1,4 +1,4 @@
-"clCreateCommandQueue"
+"clCreateCommandQueueWithProperties"
 "clCreateProgramWithIL"
 "clCreateProgramWithIL-args"
 "clCreateProgramWithSource"
@@ -11,6 +11,6 @@
 "name"
 "clReleaseCommandQueue"
 "clkp_wait"
-"clCreateCommandQueue-properties"
+"clCreateCommandQueue-properties-not-found"
 "writeILOnDisk"
 "writeKernelOnDisk"
