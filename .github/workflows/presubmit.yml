@@ -64,8 +64,8 @@ jobs:
           cmake --build third_party/pocl/build --target install
       - name: Build SPIRV-Tools
         run: |
-          git clone --depth 1 --branch v2025.1 https://github.com/KhronosGroup/SPIRV-Tools.git third_party/spirv-tools
-          git clone --depth 1 --branch v2025.1 https://github.com/KhronosGroup/SPIRV-Headers.git third_party/spirv-tools/external/spirv-headers
+          git clone --depth 1 --branch main https://github.com/KhronosGroup/SPIRV-Tools.git third_party/spirv-tools
+          git clone --depth 1 --branch main https://github.com/KhronosGroup/SPIRV-Headers.git third_party/spirv-tools/external/spirv-headers
           cmake -B third_party/spirv-tools/build -S third_party/spirv-tools -G Ninja \
             -DCMAKE_INSTALL_PREFIX=$(pwd)/third_party/spirv-tools/install \
             -DCMAKE_BUILD_TYPE=Release \
