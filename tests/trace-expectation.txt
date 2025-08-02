@@ -1,6 +1,6 @@
 "clCreateCommandQueue"
 "clCreateProgramWithIL"
-"clCreateProgramWithIL-args"
+"clCreateProgramWithIL-disassembly"
 "clCreateProgramWithSource"
 "clCreateProgramWithSource-args"
 "clEnqueueNDRangeKernel"

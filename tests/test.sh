@@ -53,7 +53,7 @@ echo "SELECT EXTRACT_ARG(arg_set_id, 'debug.string') FROM slice WHERE slice.name
                                  > "${OUTPUT_FILE}"
 
 # Check for SPIR-V binary events
-echo "SELECT EXTRACT_ARG(arg_set_id, 'debug.string') FROM slice WHERE slice.name='clCreateProgramWithIL-args'" \
+echo "SELECT EXTRACT_ARG(arg_set_id, 'debug.disassembly') FROM slice WHERE slice.name='clCreateProgramWithIL-disassembly'" \
     | "${TRACE_PROCESSOR_SHELL}" -q /dev/stdin "${TRACE_FILE}" \
                                  >> "${OUTPUT_FILE}"
 
