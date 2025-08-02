@@ -79,6 +79,7 @@ Running an application without perfetto but with the opencl-kernel-profiler laye
 * `clCreateCommandQueue`: it modifies `properties` to enable profiling (`CL_QUEUE_PROFILING_ENABLE`).
 * `clCreateCommandQueueWithProperties`: it adds `CL_QUEUE_PROPERTIES` with `CL_QUEUE_PROFILING_ENABLE`, or just set `CL_QUEUE_PROFILING_ENABLE` if `CL_QUEUE_PROPERTIES` is already set.
 * `clCreateProgramWithSource`: it creates instant traces with the program source strings and initializes internal structures.
+* `clCreateProgramWithIL`: it initializes internal structures. If SPIRV-V disassembly is supported and the program is SPIRV-V, it also creates instant traces with the program SPIRV-V disassembly.
 * `clCreateKernel`: it initializes internal structures.
 * `clEnqueueNDRangekernel`: it creates a callback on the kernel completion. The callback will create traces with the proper timestamp for the kernel using timestamp coming from `clGetEventProfilinginfo`.
 
