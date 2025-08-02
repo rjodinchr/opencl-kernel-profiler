@@ -201,7 +201,7 @@ static cl_program clkp_clCreateProgramWithIL(cl_context context, const void *il,
 #ifdef SPIRV_DISASSEMBLY
     disassembly = disassembleSpirv(il, length, program_str);
     if (!disassembly.empty()) {
-        TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY, "clCreateProgramWithIL-disassembly", "program",
+        TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY, "clCreateProgramWithIL-args", "program",
             perfetto::DynamicString(program_str), "disassembly", perfetto::DynamicString(disassembly));
     }
 #endif

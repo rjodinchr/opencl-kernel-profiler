@@ -18,17 +18,9 @@
 #include <stdint.h>
 #include <stdio.h>
 
-void vector_inc(
+void vector_inc(cl_device_id device, cl_context context, cl_command_queue command_queue,
     size_t buffer_size, void *buffer, const char **source, const size_t *source_length, const size_t *global_work_size)
 {
-    // Initialization
-    cl_platform_id platform;
-    cl_device_id device;
-    clGetPlatformIDs(1, &platform, NULL);
-    clGetDeviceIDs(platform, CL_DEVICE_TYPE_DEFAULT, 1, &device, NULL);
-    cl_context context = clCreateContext(NULL, 1, &device, NULL, NULL, NULL);
-    cl_command_queue command_queue = clCreateCommandQueue(context, device, 0, NULL);
-
     // Check if source is SPIR-V binary (starts with SPIR-V magic number 0x07230203)
     bool is_spirv = (*source_length >= 4) && (((const uint32_t *)*source)[0] == 0x07230203);
 
@@ -54,8 +46,6 @@ void vector_inc(
     clReleaseMemObject(cl_buffer);
     clReleaseKernel(kernel);
     clReleaseProgram(program);
-    clReleaseCommandQueue(command_queue);
-    clReleaseContext(context);
 }
 
 #define NB_ELEM 1024
@@ -63,13 +53,6 @@ void vector_inc(
 int main(int argc, char **argv)
 {
     printf("Starting OpenCL application\n");
-
-    uint32_t buffer[NB_ELEM];
-    for (unsigned i = 0; i < NB_ELEM; i++) {
-        buffer[i] = i + 42;
-    }
-
-    size_t global_work_size = NB_ELEM;
 
     if (argc < 2) {
         fprintf(stderr,
@@ -79,6 +62,18 @@ int main(int argc, char **argv)
     }
 
     bool success = true;
+
+    // Initialization
+    cl_platform_id platform;
+    cl_device_id device;
+    clGetPlatformIDs(1, &platform, NULL);
+    clGetDeviceIDs(platform, CL_DEVICE_TYPE_DEFAULT, 1, &device, NULL);
+    cl_context context = clCreateContext(NULL, 1, &device, NULL, NULL, NULL);
+    cl_command_queue command_queue = clCreateCommandQueue(context, device, 0, NULL);
+
+    char platform_name[512];
+    clGetPlatformInfo(platform, CL_PLATFORM_NAME, sizeof(platform_name), platform_name, NULL);
+    printf("CL_PLATFORM_NAME: %s\n", platform_name);
 
     // Process each file argument
     for (int file_idx = 1; file_idx < argc; file_idx++) {
@@ -100,7 +95,13 @@ int main(int argc, char **argv)
         } while (size_read != source_length);
         fclose(f_source);
 
-        vector_inc(sizeof(buffer), buffer, (const char **)&source, &source_length, &global_work_size);
+        uint32_t buffer[NB_ELEM];
+        for (unsigned i = 0; i < NB_ELEM; i++) {
+            buffer[i] = i + 42;
+        }
+
+        size_t global_work_size = NB_ELEM;
+        vector_inc(device, context, command_queue, sizeof(buffer), buffer, (const char **)&source, &source_length, &global_work_size);
 
         for (unsigned i = 0; i < NB_ELEM; i++) {
             if (buffer[i] != i + 43) {
@@ -110,12 +111,11 @@ int main(int argc, char **argv)
         }
 
         free(source);
-
-        // Reset buffer for next test
-        for (unsigned i = 0; i < NB_ELEM; i++) {
-            buffer[i] = i + 42;
-        }
     }
+
+    clReleaseCommandQueue(command_queue);
+    clReleaseContext(context);
+
     printf("OpenCL application completed!\n");
     return success ? 0 : -1;
 }
