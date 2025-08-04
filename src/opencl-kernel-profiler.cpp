@@ -16,6 +16,7 @@
 
 #include <CL/cl_layer.h>
 #include <assert.h>
+#include <chrono>
 #include <condition_variable>
 #include <filesystem>
 #include <fstream>
@@ -81,20 +82,16 @@ static void writeProgramOnDisk(
     std::filesystem::path filename, cl_uint count, const char **data, const size_t *lengths, bool binary)
 {
     auto dirname = filename.parent_path();
-    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "writeProgramOnDisk", "dir", perfetto::DynamicString(dirname.c_str()),
-        "program", perfetto::DynamicString(filename.filename()));
+    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "writeProgramOnDisk", "dir", perfetto::DynamicString(dirname.u8string()),
+        "program", perfetto::DynamicString(filename.filename().u8string()));
     CHECK(std::filesystem::exists(dirname), return;
           , "'%s' does not exist, could not write program on disk", dirname.c_str());
-    FILE *file = fopen(filename.c_str(), binary ? "wb" : "w");
-    CHECK(file, return;, "Could not fopen '%s'", filename.c_str());
+    std::ofstream file(filename, binary ? std::ios::binary | std::ios::trunc : std::ios::trunc);
+    CHECK(file.is_open(), return;, "Could not open '%s'", filename.c_str());
     for (unsigned i = 0; i < count; i++) {
-        size_t size_written = 0;
         size_t length = lengths == nullptr ? strlen(data[i]) : lengths[i];
-        do {
-            size_written += fwrite(&data[i][size_written], 1, length - size_written, file);
-        } while (size_written != length);
+        file.write(data[i], length);
     }
-    fclose(file);
 }
 
 #ifdef SPIRV_DISASSEMBLY
@@ -535,7 +532,7 @@ CL_API_ENTRY cl_int CL_API_CALL clInitLayer(cl_uint num_entries, const struct _c
     const uint32_t max_retry = 100;
     uint32_t retry = 0;
     while ((retry++ < max_retry) && !TRACE_EVENT_CATEGORY_ENABLED(CLKP_PERFETTO_CATEGORY)) {
-        usleep(1);
+        std::this_thread::sleep_for(std::chrono::microseconds(1));
     }
     if (!TRACE_EVENT_CATEGORY_ENABLED(CLKP_PERFETTO_CATEGORY)) {
         PRINT("perfetto category does not seem to be enabled");
