@@ -22,8 +22,57 @@ jobs:
           git-clang-format --binary clang-format-15 --diff origin/main --extensions cpp,hpp,c,cl > output.txt
           cat output.txt
           grep -E "(no modified files to format|clang-format did not modify any files)" output.txt
-  build:
-    name: Builds & Tests
+  build-macos:
+    name: MacOS Build
+    needs: format
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Clone dependencies
+        run: |
+          git clone --depth 1 --branch v45.0 https://android.googlesource.com/platform/external/perfetto third_party/perfetto
+          git clone --depth 1 --branch v2024.05.08 https://github.com/KhronosGroup/OpenCL-Headers.git third_party/opencl-headers
+      - name: Build
+        shell: bash
+        run: |
+          cmake -B build -S . \
+            -DPERFETTO_SDK_PATH="third_party/perfetto/sdk" \
+            -DOPENCL_HEADER_PATH="third_party/opencl-headers" \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+  build-windows:
+    name: Windows Build
+    needs: format
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-make
+      - name: Clone dependencies
+        run: |
+          git clone --depth 1 --branch v45.0 https://android.googlesource.com/platform/external/perfetto third_party/perfetto
+          git clone --depth 1 --branch v2024.05.08 https://github.com/KhronosGroup/OpenCL-Headers.git third_party/opencl-headers
+      - name: Configure and Build
+        shell: msys2 {0}
+        run: |
+          cmake -B build -S . -G "MinGW Makefiles" \
+            -DPERFETTO_SDK_PATH="third_party/perfetto/sdk" \
+            -DOPENCL_HEADER_PATH="third_party/opencl-headers" \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+  build-linux:
+    name: Linux Builds & Tests
     needs: format
     runs-on: ubuntu-22.04
     steps:
