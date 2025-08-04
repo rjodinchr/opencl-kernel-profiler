@@ -17,6 +17,11 @@ project (opencl-kernel-profiler)
 
 set(CMAKE_CXX_STANDARD 17)
 
+# cmake quirk - needed to pick up perfetto when compiled as a shared library on windows
+if (WIN32)
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ".dll" ${CMAKE_FIND_LIBRARY_SUFFIXES})
+endif()
+
 if (NOT PERFETTO_SDK_PATH)
   message(FATAL_ERROR "PERFETTO_SDK_PATH not defined")
 endif ()
@@ -69,6 +74,10 @@ target_compile_options(opencl-kernel-profiler PUBLIC "-DTRACE_MAX_SIZE=${TRACE_M
 
 set(TRACE_DEST "opencl-kernel-profiler.trace" CACHE STRING "Perfetto trace filename")
 target_compile_options(opencl-kernel-profiler PUBLIC "-DTRACE_DEST=\"${TRACE_DEST}\"")
+
+install(TARGETS opencl-kernel-profiler
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin)
 
 if (CLKP_BUILD_TESTS)
   add_subdirectory(tests)
