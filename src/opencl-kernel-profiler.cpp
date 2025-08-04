@@ -293,7 +293,11 @@ static void trace_callback(callback_data *data)
 
 static void queue_thread_function(ThreadInfo *thread_info)
 {
+#ifdef __APPLE__
+    pthread_setname_np("clkp");
+#else
     pthread_setname_np(pthread_self(), "clkp");
+#endif
     while (true) {
         callback_data *data = get_callback(thread_info);
         if (data == nullptr) {
