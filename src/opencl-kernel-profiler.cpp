@@ -32,9 +32,6 @@
 #ifdef SPIRV_DISASSEMBLY
 #include <spirv-tools/libspirv.hpp>
 #endif
-#ifdef _WIN32
-#include <wchar.h>
-#endif
 
 /*****************************************************************************/
 /* PERFETTO GLOBAL VARIABLES *************************************************/
@@ -122,11 +119,7 @@ static std::string get_program_str()
     return std::string("clkp_p") + std::to_string(program_number++);
 }
 
-#ifdef _WIN32
-static wchar_t *get_kernel_dir() { return _wgetenv(L"CLKP_KERNEL_DIR"); }
-#else
 static char *get_kernel_dir() { return getenv("CLKP_KERNEL_DIR"); }
-#endif
 
 static std::map<cl_program, std::string> program_to_string;
 static cl_program clkp_clCreateProgramWithSource(
