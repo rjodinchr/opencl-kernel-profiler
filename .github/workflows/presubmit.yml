@@ -33,63 +33,36 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install ninja-build clang-15 ocl-icd-libopencl1 ocl-icd-dev ocl-icd-opencl-dev
+          sudo apt-get install ninja-build clang-15
       - name: Setup environement variables
         shell: bash
         run: |
           set -x
+          pocl_version="v6.0"
+          spirv_tools_version="vulkan-sdk-1.4.321"
+          icd_loader_version="v2024.05.08"
           perfetto_version="v45.0"
           perfetto_key="perfetto-${perfetto_version}"
           perfetto_dir="$(realpath ${{ github.workspace }}/../perfetto)"
-          pocl_version="v6.0"
-          pocl_key="pocl-${pocl_version}"
-          pocl_dir="$(realpath ${{ github.workspace }}/../pocl)"
-          spirv_tools_version="vulkan-sdk-1.4.321"
-          spirv_tools_key="spirv_tools-${spirv_tools_version}"
-          spirv_tools_dir="$(realpath ${{ github.workspace }}/../spirv-tools)"
-          icd_loader_version="v2024.05.08"
-          icd_loader_key="icd_loader-${icd_loader_version}"
-          icd_loader_dir="$(realpath ${{ github.workspace }}/../opencl-icd-loader)"
+          echo "pocl_version=${pocl_version}" >> $GITHUB_ENV
+          echo "spirv_tools_version=${spirv_tools_version}" >> $GITHUB_ENV
+          echo "icd_loader_version=${icd_loader_version}" >> $GITHUB_ENV
           echo "perfetto_version=${perfetto_version}" >> $GITHUB_ENV
           echo "perfetto_key=${perfetto_key}" >> $GITHUB_ENV
           echo "perfetto_dir=${perfetto_dir}" >> $GITHUB_ENV
-          echo "pocl_version=${pocl_version}" >> $GITHUB_ENV
-          echo "pocl_key=${pocl_key}" >> $GITHUB_ENV
-          echo "pocl_dir=${pocl_dir}" >> $GITHUB_ENV
-          echo "spirv_tools_version=${spirv_tools_version}" >> $GITHUB_ENV
-          echo "spirv_tools_key=${spirv_tools_key}" >> $GITHUB_ENV
-          echo "spirv_tools_dir=${spirv_tools_dir}" >> $GITHUB_ENV
-          echo "icd_loader_version=${icd_loader_version}" >> $GITHUB_ENV
-          echo "icd_loader_key=${icd_loader_key}" >> $GITHUB_ENV
-          echo "icd_loader_dir=${icd_loader_dir}" >> $GITHUB_ENV
           mkdir -p "${perfetto_dir}"
-          mkdir -p "${pocl_dir}"
-          mkdir -p "${spirv_tools_dir}"
-          mkdir -p "${icd_loader_dir}"
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          variant: sccache
+          max-size: 2G
+          key: ${{ env.pocl_version }}-${{ env.spirv_tools_version }}-${{ env.icd_loader_version }}
       - name: Get Perfetto from cache
         id: perfetto
         uses: actions/cache@v4
         with:
           path: ${{ env.perfetto_dir }}
           key: ${{ env.perfetto_key }}
-      # - name: Get pocl from cache
-      #   id: pocl
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: ${{ env.pocl_dir }}
-      #     key: ${{ env.pocl_key }}
-      - name: Get SPIRV-Tools from cache
-        id: spirv_tools
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.spirv_tools_dir }}
-          key: ${{ env.spirv_tools_key }}
-      - name: Get OpenCL-ICD-Loader from cache
-        id: icd_loader
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.icd_loader_dir }}
-          key: ${{ env.icd_loader_key }}
       - name: Build Perfetto
         if: steps.perfetto.outputs.cache-hit != 'true'
         run: |
@@ -99,39 +72,36 @@ jobs:
           $(pwd)/third_party/perfetto/tools/ninja -C $(pwd)/third_party/perfetto/out/linux_clang_release trace_processor_shell
           cp $(pwd)/third_party/perfetto/sdk/perfetto.* $(pwd)/third_party/perfetto/out/linux_clang_release/trace_processor_shell ${{ env.perfetto_dir }}/
       - name: Build OpenCL-ICD-Loader
-        if: steps.icd_loader.outputs.cache-hit != 'true'
         run: |
           git clone --depth 1 --branch ${{ env.icd_loader_version }} https://github.com/KhronosGroup/OpenCL-Headers.git third_party/opencl-headers
           git clone --depth 1 --branch ${{ env.icd_loader_version }} https://github.com/KhronosGroup/OpenCL-ICD-Loader.git third_party/opencl-icd-loader
           cmake -B third_party/opencl-icd-loader/build -S third_party/opencl-icd-loader -G Ninja \
-            -DCMAKE_INSTALL_PREFIX=${{ env.icd_loader_dir }} \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
             -DOPENCL_ICD_LOADER_HEADERS_DIR=$(pwd)/third_party/opencl-headers \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER="$(which clang++)" \
             -DCMAKE_C_COMPILER="$(which clang)"
-          cmake --build third_party/opencl-icd-loader/build --target install
-          cp -r third_party/opencl-headers/CL ${{ env.icd_loader_dir }}
+          cmake --build third_party/opencl-icd-loader/build
       - name: Install pocl dependencies
-        if: steps.pocl.outputs.cache-hit != 'true'
         run: |
           sudo apt-get install -y python3-dev libpython3-dev build-essential ocl-icd-libopencl1 cmake git pkg-config libclang-15-dev clang-15 llvm-15 make ninja-build ocl-icd-libopencl1 ocl-icd-dev ocl-icd-opencl-dev libhwloc-dev zlib1g zlib1g-dev clinfo dialog apt-utils libxml2-dev libclang-cpp15-dev libclang-cpp15 llvm-15-dev llvm-spirv-15
       - name: Build pocl
-        if: steps.pocl.outputs.cache-hit != 'true'
         run: |
           git clone --depth 1 --branch ${{ env.pocl_version }} https://github.com/pocl/pocl.git third_party/pocl
           cmake -B third_party/pocl/build -S third_party/pocl -G Ninja \
-            -DCMAKE_INSTALL_PREFIX=${{ env.pocl_dir }} \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_INSTALL_PREFIX=$(pwd)/third_party/pocl/install \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER="$(which clang++)" \
             -DCMAKE_C_COMPILER="$(which clang)"
           cmake --build third_party/pocl/build --target install
       - name: Build SPIRV-Tools
-        if: steps.spirv_tools.outputs.cache-hit != 'true'
         run: |
           git clone --depth 1 --branch main https://github.com/KhronosGroup/SPIRV-Tools.git third_party/spirv-tools
           git clone --depth 1 --branch main https://github.com/KhronosGroup/SPIRV-Headers.git third_party/spirv-tools/external/spirv-headers
           cmake -B third_party/spirv-tools/build -S third_party/spirv-tools -G Ninja \
-            -DCMAKE_INSTALL_PREFIX=${{ env.spirv_tools_dir }} \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_INSTALL_PREFIX=$(pwd)/third_party/spirv-tools/install \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER="$(which clang++)" \
             -DCMAKE_C_COMPILER="$(which clang)" \
@@ -141,7 +111,7 @@ jobs:
         run: |
           cmake -B build_debug -S . -G Ninja \
             -DPERFETTO_SDK_PATH="${{ env.perfetto_dir }}" \
-            -DOPENCL_HEADER_PATH="${{ env.icd_loader_dir }}" \
+            -DOPENCL_HEADER_PATH="$(pwd)/third_party/opencl-headers" \
             -DCMAKE_CXX_COMPILER="$(which clang++)" \
             -DCMAKE_BUILD_TYPE=Debug
           cmake --build build_debug
@@ -149,21 +119,21 @@ jobs:
         run: |
           cmake -B build_release -S . -G Ninja \
             -DPERFETTO_SDK_PATH="${{ env.perfetto_dir }}" \
-            -DOPENCL_HEADER_PATH="${{ env.icd_loader_dir }}" \
+            -DOPENCL_HEADER_PATH="$(pwd)/third_party/opencl-headers" \
             -DCMAKE_CXX_COMPILER="$(which clang++)" \
             -DCMAKE_C_COMPILER="$(which clang)" \
             -DCLKP_BUILD_TESTS=1 \
-            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_BUILD_TYPE=Release \
             -DSPIRV_DISASSEMBLY=ON \
-            -DCMAKE_PREFIX_PATH="${{ env.spirv_tools_dir }}"
+            -DCMAKE_PREFIX_PATH="$(pwd)/third_party/spirv-tools/install"
           cmake --build build_release
       - name: Tests
         env:
           OCL_ICD_ENABLE_TRACE: 1
-          OCL_ICD_FILENAMES: ${{ env.pocl_dir }}/lib/libpocl.so
+          OCL_ICD_FILENAMES: ${{ github.workspace }}/third_party/pocl/install/lib/libpocl.so
           OPENCL_LAYERS: ${{ github.workspace }}/build_release/libopencl-kernel-profiler.so
           TRACE_PROCESSOR_SHELL: ${{ env.perfetto_dir }}/trace_processor_shell
         run: |
-          PATH=${{ env.spirv_tools_dir }}/bin:$PATH \
-          LD_LIBRARY_PATH=${{ env.icd_loader_dir }}/lib:$LD_LIBRARY_PATH \
+          PATH=$(pwd)/third_party/spirv-tools/install/bin:$PATH \
+          LD_LIBRARY_PATH=$(pwd)/third_party/opencl-icd-loader/build:$LD_LIBRARY_PATH \
           $(pwd)/tests/test.sh "$(pwd)/build_release/tests/opencl-kernel-profiler-test"
