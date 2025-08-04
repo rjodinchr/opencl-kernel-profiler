@@ -13,6 +13,7 @@
 * [OpenCL-ICD-Loader](https://github.com/KhronosGroup/OpenCL-ICD-Loader)
 * [OpenCL-Headers](https://github.com/KhronosGroup/OpenCL-Headers)
 * [perfetto](https://github.com/google/perfetto)
+* [SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools) (optional: to disassemble SPIR-V IL when `SPIRV_DISASSEMBLY` is enabled)
 
 `opencl-kernel-profiler` also (obviously) depends on a OpenCL implementation.
 

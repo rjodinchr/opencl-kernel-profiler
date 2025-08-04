@@ -77,107 +77,64 @@ static const struct _cl_icd_dispatch *tdispatch;
 
 static std::mutex g_lock;
 
-static void writeKernelOnDisk(
-    const char *dir, std::string &program_name, cl_uint count, const char **strings, const size_t *lengths)
+static void writeProgramOnDisk(
+    std::filesystem::path filename, cl_uint count, const char **data, const size_t *lengths, bool binary)
 {
-    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "writeKernelOnDisk", "dir", perfetto::DynamicString(dir), "program",
-        perfetto::DynamicString(program_name));
-    std::filesystem::path filename(dir);
-    if (!std::filesystem::exists(filename)) {
-        PRINT("'%s' does not exist, could not write kernel on disk", dir);
-        return;
-    }
-    filename /= program_name;
-    filename += ".cl";
-    FILE *file = fopen(filename.c_str(), "w");
+    auto dirname = filename.parent_path();
+    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "writeProgramOnDisk", "dir", perfetto::DynamicString(dirname.c_str()),
+        "program", perfetto::DynamicString(filename.filename()));
+    CHECK(std::filesystem::exists(dirname), return;
+          , "'%s' does not exist, could not write program on disk", dirname.c_str());
+    FILE *file = fopen(filename.c_str(), binary ? "wb" : "w");
+    CHECK(file, return;, "Could not fopen '%s'", filename.c_str());
     for (unsigned i = 0; i < count; i++) {
         size_t size_written = 0;
-        const uint8_t *data = (const uint8_t *)strings[i];
-        size_t code_size = lengths == nullptr ? strlen(strings[i]) : lengths[i];
+        size_t length = lengths == nullptr ? strlen(data[i]) : lengths[i];
         do {
-            size_written += fwrite(&data[size_written], 1, code_size - size_written, file);
-        } while (size_written != code_size);
+            size_written += fwrite(&data[i][size_written], 1, length - size_written, file);
+        } while (size_written != length);
     }
     fclose(file);
 }
 
 #ifdef SPIRV_DISASSEMBLY
-static std::string disassembleSpirv(const void *il, size_t length, const std::string &program_name)
+static bool tryDisassembleSpirv(
+    const void *il, size_t length, const std::string &program_name, std::string &disassembly)
 {
     const uint32_t *spirv_data = (const uint32_t *)(il);
     size_t spirv_words = length / sizeof(uint32_t);
 
     // Check for SPIR-V magic number
     if (spirv_words == 0 || *spirv_data != 0x07230203) {
-        return "";
+        return false;
     }
 
     spvtools::SpirvTools tools(SPV_ENV_OPENCL_2_2);
-    std::string disassembly;
-
-    if (tools.Disassemble(spirv_data, spirv_words, &disassembly)) {
-        return disassembly;
-    } else {
-        PRINT("Failed to disassemble SPIR-V for program %s", program_name.c_str());
-        return "";
-    }
+    CHECK(tools.Disassemble(spirv_data, spirv_words, &disassembly), return false;
+          , "Failed to disassemble SPIR-V for program %s", program_name.c_str());
+    return true;
 }
 #endif
 
-static void writeILOnDisk(
-    const char *dir, std::string &program_name, const void *il, size_t length, const std::string &disassembly)
+static std::string get_program_str()
 {
-    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "writeILOnDisk", "dir", perfetto::DynamicString(dir), "program",
-        perfetto::DynamicString(program_name));
-
-    std::filesystem::path base_path(dir);
-    if (!std::filesystem::exists(base_path)) {
-        PRINT("'%s' does not exist, could not write SPIR-V on disk", dir);
-        return;
-    }
-
-    // Write the raw IL binary
-    std::filesystem::path il_filename = base_path / program_name;
-    il_filename += ".il";
-    FILE *file = fopen(il_filename.c_str(), "wb");
-    if (file) {
-        size_t size_written = 0;
-        const uint8_t *data = (const uint8_t *)il;
-        do {
-            size_written += fwrite(&data[size_written], 1, length - size_written, file);
-        } while (size_written != length);
-        fclose(file);
-    }
-
-    // Write the disassembly if provided
-    if (!disassembly.empty()) {
-        std::filesystem::path asm_filename = base_path / program_name;
-        asm_filename += ".spvasm";
-        FILE *asm_file = fopen(asm_filename.c_str(), "w");
-        if (asm_file) {
-            size_t size_written = 0;
-            const uint8_t *data = (const uint8_t *)disassembly.c_str();
-            size_t code_size = disassembly.length();
-            do {
-                size_written += fwrite(&data[size_written], 1, code_size - size_written, asm_file);
-            } while (size_written != code_size);
-            fclose(asm_file);
-        }
-    }
+    static uint32_t program_number = 0;
+    return std::string("clkp_p") + std::to_string(program_number++);
 }
 
-static uint32_t program_number = 0;
+static char *get_kernel_dir() { return getenv("CLKP_KERNEL_DIR"); }
+
 static std::map<cl_program, std::string> program_to_string;
 static cl_program clkp_clCreateProgramWithSource(
     cl_context context, cl_uint count, const char **strings, const size_t *lengths, cl_int *errcode_ret)
 {
     std::lock_guard<std::mutex> lock(g_lock);
-    std::string program_str = std::string("clkp_p") + std::to_string(program_number++);
+    std::string program_str = get_program_str();
     TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateProgramWithSource", "program", perfetto::DynamicString(program_str),
         "count", count);
 
-    if (auto dir = getenv("CLKP_KERNEL_DIR")) {
-        writeKernelOnDisk(dir, program_str, count, strings, lengths);
+    if (auto dir = get_kernel_dir()) {
+        writeProgramOnDisk(std::filesystem::path(dir) / (program_str + ".cl"), count, strings, lengths, false);
     }
 
     cl_program program = tdispatch->clCreateProgramWithSource(context, count, strings, lengths, errcode_ret);
@@ -192,22 +149,35 @@ static cl_program clkp_clCreateProgramWithSource(
 static cl_program clkp_clCreateProgramWithIL(cl_context context, const void *il, size_t length, cl_int *errcode_ret)
 {
     std::lock_guard<std::mutex> lock(g_lock);
-    std::string program_str = std::string("clkp_p") + std::to_string(program_number++);
-
+    std::string program_str = get_program_str();
     TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateProgramWithIL", "program",
         perfetto::DynamicString(program_str.c_str()), "length", length);
 
     std::string disassembly;
+    bool is_spirv = false;
 #ifdef SPIRV_DISASSEMBLY
-    disassembly = disassembleSpirv(il, length, program_str);
-    if (!disassembly.empty()) {
+    is_spirv = tryDisassembleSpirv(il, length, program_str, disassembly);
+    if (is_spirv) {
         TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY, "clCreateProgramWithIL-args", "program",
             perfetto::DynamicString(program_str), "disassembly", perfetto::DynamicString(disassembly));
     }
 #endif
 
-    if (auto dir = getenv("CLKP_KERNEL_DIR")) {
-        writeILOnDisk(dir, program_str, il, length, disassembly);
+    if (auto dir = get_kernel_dir()) {
+        std::filesystem::path filename = std::filesystem::path(dir) / program_str;
+
+        // Write the raw IL binary
+        std::filesystem::path il_filename = filename.replace_extension(is_spirv ? "spv" : "il");
+        const char *il_str = (const char *)il;
+        writeProgramOnDisk(il_filename, 1, &il_str, &length, true);
+
+        if (is_spirv) {
+            // Write the disassembly
+            std::filesystem::path asm_filename = filename.replace_extension("spvasm");
+            const char *disassembly_str = disassembly.c_str();
+            size_t disassembly_length = disassembly.length();
+            writeProgramOnDisk(asm_filename, 1, &disassembly_str, &disassembly_length, false);
+        }
     }
 
     cl_program program = tdispatch->clCreateProgramWithIL(context, il, length, errcode_ret);
