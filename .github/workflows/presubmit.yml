@@ -56,7 +56,7 @@ jobs:
           git -C third_party/perfetto apply ../../.github/workflows/perfetto_mingw.patch
           git -C third_party/perfetto apply ../../.github/workflows/header_mingw.patch
           git clone --depth 1 --branch v2024.05.08 https://github.com/KhronosGroup/OpenCL-Headers.git third_party/opencl-headers
-      - name: Configure and Build
+      - name: Build
         shell: bash
         run: |
           cmake -B build -S . -G "MinGW Makefiles" \
