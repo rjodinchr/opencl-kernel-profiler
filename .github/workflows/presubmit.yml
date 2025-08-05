@@ -50,21 +50,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Set up MSYS2
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          update: true
-          install: >-
-            mingw-w64-x86_64-toolchain
-            mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-make
       - name: Clone dependencies
         run: |
-          git clone --depth 1 --branch v45.0 https://android.googlesource.com/platform/external/perfetto third_party/perfetto
+          git clone --depth 1 --branch v51.2 https://github.com/google/perfetto third_party/perfetto
+          cd third_party/perfetto
+          git apply ../../.github/workflows/perfetto_mingw.patch
+          git apply ../../.github/workflows/header_mingw.patch
+          cd ../..
           git clone --depth 1 --branch v2024.05.08 https://github.com/KhronosGroup/OpenCL-Headers.git third_party/opencl-headers
       - name: Configure and Build
-        shell: msys2 {0}
+        shell: bash
         run: |
           cmake -B build -S . -G "MinGW Makefiles" \
             -DPERFETTO_SDK_PATH="third_party/perfetto/sdk" \
