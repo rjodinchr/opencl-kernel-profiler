@@ -50,12 +50,16 @@ if (OPENCL_HEADER_PATH)
   target_include_directories(opencl-kernel-profiler PUBLIC ${OPENCL_HEADER_PATH})
 endif()
 
+target_link_libraries(opencl-kernel-profiler ${PERFETTO_LIBRARY})
+
+if (WIN32)
+  target_link_libraries(opencl-kernel-profiler ws2_32)
+endif()
+
 if (SPIRV_DISASSEMBLY)
   target_include_directories(opencl-kernel-profiler PUBLIC ${SPIRV_TOOLS_INCLUDE_DIR})
-  target_link_libraries(opencl-kernel-profiler ${PERFETTO_LIBRARY} ${SPIRV_TOOLS_LIBRARY})
+  target_link_libraries(opencl-kernel-profiler ${SPIRV_TOOLS_LIBRARY})
   target_compile_definitions(opencl-kernel-profiler PRIVATE SPIRV_DISASSEMBLY)
-else()
-  target_link_libraries(opencl-kernel-profiler ${PERFETTO_LIBRARY})
 endif()
 
 set(BACKEND "InProcess"
