@@ -32,7 +32,7 @@ jobs:
           fetch-depth: 0
       - name: Clone dependencies
         run: |
-          git clone --depth 1 --branch v45.0 https://android.googlesource.com/platform/external/perfetto third_party/perfetto
+          git clone --depth 1 --branch v51.2 https://android.googlesource.com/platform/external/perfetto third_party/perfetto
           git clone --depth 1 --branch v2024.05.08 https://github.com/KhronosGroup/OpenCL-Headers.git third_party/opencl-headers
       - name: Build
         shell: bash
@@ -80,10 +80,10 @@ jobs:
         shell: bash
         run: |
           set -x
-          pocl_version="v6.0"
+          pocl_version="v7.0"
           spirv_tools_version="vulkan-sdk-1.4.321"
           icd_loader_version="v2024.05.08"
-          perfetto_version="v45.0"
+          perfetto_version="v51.2"
           perfetto_key="perfetto-${perfetto_version}"
           perfetto_dir="$(realpath ${{ github.workspace }}/../perfetto)"
           echo "pocl_version=${pocl_version}" >> $GITHUB_ENV
@@ -98,7 +98,6 @@ jobs:
         with:
           variant: sccache
           max-size: 2G
-          key: ${{ env.pocl_version }}-${{ env.spirv_tools_version }}-${{ env.icd_loader_version }}
       - name: Get Perfetto from cache
         id: perfetto
         uses: actions/cache@v4
