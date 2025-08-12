@@ -80,7 +80,7 @@ jobs:
         shell: bash
         run: |
           set -x
-          pocl_version="v7.0"
+          pocl_version="v6.0"
           spirv_tools_version="vulkan-sdk-1.4.321"
           icd_loader_version="v2024.05.08"
           perfetto_version="v51.2"
