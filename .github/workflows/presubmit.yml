@@ -32,7 +32,7 @@ jobs:
           fetch-depth: 0
       - name: Clone dependencies
         run: |
-          git clone --depth 1 --branch v51.2 https://android.googlesource.com/platform/external/perfetto third_party/perfetto
+          git clone --depth 1 --branch v51.2 https://github.com/google/perfetto third_party/perfetto
           git clone --depth 1 --branch v2024.05.08 https://github.com/KhronosGroup/OpenCL-Headers.git third_party/opencl-headers
       - name: Build
         shell: bash
@@ -107,7 +107,7 @@ jobs:
       - name: Build Perfetto
         if: steps.perfetto.outputs.cache-hit != 'true'
         run: |
-          git clone --depth 1 --branch ${{ env.perfetto_version }} https://android.googlesource.com/platform/external/perfetto third_party/perfetto
+          git clone --depth 1 --branch ${{ env.perfetto_version }} https://github.com/google/perfetto third_party/perfetto
           $(pwd)/third_party/perfetto/tools/install-build-deps
           $(pwd)/third_party/perfetto/tools/setup_all_configs.py
           $(pwd)/third_party/perfetto/tools/ninja -C $(pwd)/third_party/perfetto/out/linux_clang_release trace_processor_shell
