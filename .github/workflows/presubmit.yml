@@ -8,18 +8,18 @@ on:
 jobs:
   format:
     name: Check code formatting
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - name: Install clang-format
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-format clang-format-15
+          sudo apt-get install -y clang-format clang-format-18
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Check format
         run: |
-          git-clang-format --binary clang-format-15 --diff origin/main --extensions cpp,hpp,c,cl > output.txt
+          git-clang-format --binary clang-format-18 --diff origin/main --extensions cpp,hpp,c,cl > output.txt
           cat output.txt
           grep -E "(no modified files to format|clang-format did not modify any files)" output.txt
   build-macos:
@@ -67,7 +67,7 @@ jobs:
   build-linux:
     name: Linux Builds & Tests
     needs: format
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -75,7 +75,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install ninja-build clang-15
+          sudo apt-get install ninja-build clang-18
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
@@ -100,10 +100,10 @@ jobs:
           cmake --build third_party/opencl-icd-loader/build
       - name: Install pocl dependencies
         run: |
-          sudo apt-get install -y python3-dev libpython3-dev build-essential ocl-icd-libopencl1 cmake git pkg-config libclang-15-dev clang-15 llvm-15 make ninja-build ocl-icd-libopencl1 ocl-icd-dev ocl-icd-opencl-dev libhwloc-dev zlib1g zlib1g-dev clinfo dialog apt-utils libxml2-dev libclang-cpp15-dev libclang-cpp15 llvm-15-dev llvm-spirv-15
+          sudo apt-get install -y python3-dev libpython3-dev build-essential ocl-icd-libopencl1 cmake git pkg-config libclang-18-dev clang-18 llvm-18 make ninja-build ocl-icd-libopencl1 ocl-icd-dev ocl-icd-opencl-dev libhwloc-dev zlib1g zlib1g-dev clinfo dialog apt-utils libxml2-dev libclang-cpp18-dev libclang-cpp18 llvm-18-dev llvm-spirv-18
       - name: Build pocl
         run: |
-          git clone --depth 1 --branch v6.0 https://github.com/pocl/pocl.git third_party/pocl
+          git clone --depth 1 --branch v7.0 https://github.com/pocl/pocl.git third_party/pocl
           cmake -B third_party/pocl/build -S third_party/pocl -G Ninja \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_INSTALL_PREFIX=$(pwd)/third_party/pocl/install \
