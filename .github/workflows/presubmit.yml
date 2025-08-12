@@ -79,21 +79,20 @@ jobs:
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
-          variant: sccache
+          variant: ccache
           max-size: 2G
-          create-symlink: true
       - name: Build Perfetto
         run: |
           git clone --depth 1 --branch v51.2 https://github.com/google/perfetto third_party/perfetto
           $(pwd)/third_party/perfetto/tools/install-build-deps
-          $(pwd)/third_party/perfetto/tools/setup_all_configs.py
+          $(pwd)/third_party/perfetto/tools/setup_all_configs.py --ccache
           $(pwd)/third_party/perfetto/tools/ninja -C $(pwd)/third_party/perfetto/out/linux_clang_release trace_processor_shell
       - name: Build OpenCL-ICD-Loader
         run: |
           git clone --depth 1 --branch v2024.05.08 https://github.com/KhronosGroup/OpenCL-Headers.git third_party/opencl-headers
           git clone --depth 1 --branch v2024.05.08 https://github.com/KhronosGroup/OpenCL-ICD-Loader.git third_party/opencl-icd-loader
           cmake -B third_party/opencl-icd-loader/build -S third_party/opencl-icd-loader -G Ninja \
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DOPENCL_ICD_LOADER_HEADERS_DIR=$(pwd)/third_party/opencl-headers \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER="$(which clang++)" \
@@ -106,7 +105,7 @@ jobs:
         run: |
           git clone --depth 1 --branch v6.0 https://github.com/pocl/pocl.git third_party/pocl
           cmake -B third_party/pocl/build -S third_party/pocl -G Ninja \
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_INSTALL_PREFIX=$(pwd)/third_party/pocl/install \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER="$(which clang++)" \
@@ -117,7 +116,7 @@ jobs:
           git clone --depth 1 --branch main https://github.com/KhronosGroup/SPIRV-Tools.git third_party/spirv-tools
           git clone --depth 1 --branch main https://github.com/KhronosGroup/SPIRV-Headers.git third_party/spirv-tools/external/spirv-headers
           cmake -B third_party/spirv-tools/build -S third_party/spirv-tools -G Ninja \
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_INSTALL_PREFIX=$(pwd)/third_party/spirv-tools/install \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER="$(which clang++)" \
