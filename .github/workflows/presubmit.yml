@@ -80,15 +80,9 @@ jobs:
         shell: bash
         run: |
           set -x
-          pocl_version="v6.0"
-          spirv_tools_version="vulkan-sdk-1.4.321"
-          icd_loader_version="v2024.05.08"
           perfetto_version="v51.2"
           perfetto_key="perfetto-${perfetto_version}"
           perfetto_dir="$(realpath ${{ github.workspace }}/../perfetto)"
-          echo "pocl_version=${pocl_version}" >> $GITHUB_ENV
-          echo "spirv_tools_version=${spirv_tools_version}" >> $GITHUB_ENV
-          echo "icd_loader_version=${icd_loader_version}" >> $GITHUB_ENV
           echo "perfetto_version=${perfetto_version}" >> $GITHUB_ENV
           echo "perfetto_key=${perfetto_key}" >> $GITHUB_ENV
           echo "perfetto_dir=${perfetto_dir}" >> $GITHUB_ENV
@@ -114,8 +108,8 @@ jobs:
           cp $(pwd)/third_party/perfetto/sdk/perfetto.* $(pwd)/third_party/perfetto/out/linux_clang_release/trace_processor_shell ${{ env.perfetto_dir }}/
       - name: Build OpenCL-ICD-Loader
         run: |
-          git clone --depth 1 --branch ${{ env.icd_loader_version }} https://github.com/KhronosGroup/OpenCL-Headers.git third_party/opencl-headers
-          git clone --depth 1 --branch ${{ env.icd_loader_version }} https://github.com/KhronosGroup/OpenCL-ICD-Loader.git third_party/opencl-icd-loader
+          git clone --depth 1 --branch v2024.05.08 https://github.com/KhronosGroup/OpenCL-Headers.git third_party/opencl-headers
+          git clone --depth 1 --branch v2024.05.08 https://github.com/KhronosGroup/OpenCL-ICD-Loader.git third_party/opencl-icd-loader
           cmake -B third_party/opencl-icd-loader/build -S third_party/opencl-icd-loader -G Ninja \
             -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
             -DOPENCL_ICD_LOADER_HEADERS_DIR=$(pwd)/third_party/opencl-headers \
@@ -128,7 +122,7 @@ jobs:
           sudo apt-get install -y python3-dev libpython3-dev build-essential ocl-icd-libopencl1 cmake git pkg-config libclang-15-dev clang-15 llvm-15 make ninja-build ocl-icd-libopencl1 ocl-icd-dev ocl-icd-opencl-dev libhwloc-dev zlib1g zlib1g-dev clinfo dialog apt-utils libxml2-dev libclang-cpp15-dev libclang-cpp15 llvm-15-dev llvm-spirv-15
       - name: Build pocl
         run: |
-          git clone --depth 1 --branch ${{ env.pocl_version }} https://github.com/pocl/pocl.git third_party/pocl
+          git clone --depth 1 --branch v6.0 https://github.com/pocl/pocl.git third_party/pocl
           cmake -B third_party/pocl/build -S third_party/pocl -G Ninja \
             -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
             -DCMAKE_INSTALL_PREFIX=$(pwd)/third_party/pocl/install \
