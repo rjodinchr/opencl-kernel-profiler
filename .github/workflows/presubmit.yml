@@ -32,7 +32,7 @@ jobs:
           fetch-depth: 0
       - name: Clone dependencies
         run: |
-          git clone --depth 1 --branch v45.0 https://android.googlesource.com/platform/external/perfetto third_party/perfetto
+          git clone --depth 1 --branch v51.2 https://github.com/google/perfetto third_party/perfetto
           git clone --depth 1 --branch v2024.05.08 https://github.com/KhronosGroup/OpenCL-Headers.git third_party/opencl-headers
       - name: Build
         shell: bash
@@ -76,47 +76,22 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install ninja-build clang-15
-      - name: Setup environement variables
-        shell: bash
-        run: |
-          set -x
-          pocl_version="v6.0"
-          spirv_tools_version="vulkan-sdk-1.4.321"
-          icd_loader_version="v2024.05.08"
-          perfetto_version="v45.0"
-          perfetto_key="perfetto-${perfetto_version}"
-          perfetto_dir="$(realpath ${{ github.workspace }}/../perfetto)"
-          echo "pocl_version=${pocl_version}" >> $GITHUB_ENV
-          echo "spirv_tools_version=${spirv_tools_version}" >> $GITHUB_ENV
-          echo "icd_loader_version=${icd_loader_version}" >> $GITHUB_ENV
-          echo "perfetto_version=${perfetto_version}" >> $GITHUB_ENV
-          echo "perfetto_key=${perfetto_key}" >> $GITHUB_ENV
-          echo "perfetto_dir=${perfetto_dir}" >> $GITHUB_ENV
-          mkdir -p "${perfetto_dir}"
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           variant: sccache
           max-size: 2G
-          key: ${{ env.pocl_version }}-${{ env.spirv_tools_version }}-${{ env.icd_loader_version }}
-      - name: Get Perfetto from cache
-        id: perfetto
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.perfetto_dir }}
-          key: ${{ env.perfetto_key }}
+          create-symlink: true
       - name: Build Perfetto
-        if: steps.perfetto.outputs.cache-hit != 'true'
         run: |
-          git clone --depth 1 --branch ${{ env.perfetto_version }} https://android.googlesource.com/platform/external/perfetto third_party/perfetto
+          git clone --depth 1 --branch v51.2 https://github.com/google/perfetto third_party/perfetto
           $(pwd)/third_party/perfetto/tools/install-build-deps
           $(pwd)/third_party/perfetto/tools/setup_all_configs.py
           $(pwd)/third_party/perfetto/tools/ninja -C $(pwd)/third_party/perfetto/out/linux_clang_release trace_processor_shell
-          cp $(pwd)/third_party/perfetto/sdk/perfetto.* $(pwd)/third_party/perfetto/out/linux_clang_release/trace_processor_shell ${{ env.perfetto_dir }}/
       - name: Build OpenCL-ICD-Loader
         run: |
-          git clone --depth 1 --branch ${{ env.icd_loader_version }} https://github.com/KhronosGroup/OpenCL-Headers.git third_party/opencl-headers
-          git clone --depth 1 --branch ${{ env.icd_loader_version }} https://github.com/KhronosGroup/OpenCL-ICD-Loader.git third_party/opencl-icd-loader
+          git clone --depth 1 --branch v2024.05.08 https://github.com/KhronosGroup/OpenCL-Headers.git third_party/opencl-headers
+          git clone --depth 1 --branch v2024.05.08 https://github.com/KhronosGroup/OpenCL-ICD-Loader.git third_party/opencl-icd-loader
           cmake -B third_party/opencl-icd-loader/build -S third_party/opencl-icd-loader -G Ninja \
             -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
             -DOPENCL_ICD_LOADER_HEADERS_DIR=$(pwd)/third_party/opencl-headers \
@@ -129,7 +104,7 @@ jobs:
           sudo apt-get install -y python3-dev libpython3-dev build-essential ocl-icd-libopencl1 cmake git pkg-config libclang-15-dev clang-15 llvm-15 make ninja-build ocl-icd-libopencl1 ocl-icd-dev ocl-icd-opencl-dev libhwloc-dev zlib1g zlib1g-dev clinfo dialog apt-utils libxml2-dev libclang-cpp15-dev libclang-cpp15 llvm-15-dev llvm-spirv-15
       - name: Build pocl
         run: |
-          git clone --depth 1 --branch ${{ env.pocl_version }} https://github.com/pocl/pocl.git third_party/pocl
+          git clone --depth 1 --branch v6.0 https://github.com/pocl/pocl.git third_party/pocl
           cmake -B third_party/pocl/build -S third_party/pocl -G Ninja \
             -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
             -DCMAKE_INSTALL_PREFIX=$(pwd)/third_party/pocl/install \
@@ -152,7 +127,7 @@ jobs:
       - name: Build debug
         run: |
           cmake -B build_debug -S . -G Ninja \
-            -DPERFETTO_SDK_PATH="${{ env.perfetto_dir }}" \
+            -DPERFETTO_SDK_PATH="${{ github.workspace }}/third_party/perfetto/sdk/" \
             -DOPENCL_HEADER_PATH="$(pwd)/third_party/opencl-headers" \
             -DCMAKE_CXX_COMPILER="$(which clang++)" \
             -DCMAKE_BUILD_TYPE=Debug
@@ -160,7 +135,7 @@ jobs:
       - name: Build release
         run: |
           cmake -B build_release -S . -G Ninja \
-            -DPERFETTO_SDK_PATH="${{ env.perfetto_dir }}" \
+            -DPERFETTO_SDK_PATH="${{ github.workspace }}/third_party/perfetto/sdk/" \
             -DOPENCL_HEADER_PATH="$(pwd)/third_party/opencl-headers" \
             -DCMAKE_CXX_COMPILER="$(which clang++)" \
             -DCMAKE_C_COMPILER="$(which clang)" \
@@ -174,7 +149,7 @@ jobs:
           OCL_ICD_ENABLE_TRACE: 1
           OCL_ICD_FILENAMES: ${{ github.workspace }}/third_party/pocl/install/lib/libpocl.so
           OPENCL_LAYERS: ${{ github.workspace }}/build_release/libopencl-kernel-profiler.so
-          TRACE_PROCESSOR_SHELL: ${{ env.perfetto_dir }}/trace_processor_shell
+          TRACE_PROCESSOR_SHELL: ${{ github.workspace }}/third_party/perfetto/out/linux_clang_release/trace_processor_shell
         run: |
           PATH=$(pwd)/third_party/spirv-tools/install/bin:$PATH \
           LD_LIBRARY_PATH=$(pwd)/third_party/opencl-icd-loader/build:$LD_LIBRARY_PATH \
