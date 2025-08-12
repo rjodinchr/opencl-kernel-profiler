@@ -92,6 +92,7 @@ jobs:
         with:
           variant: sccache
           max-size: 2G
+          create-symlink: true
       - name: Get Perfetto from cache
         id: perfetto
         uses: actions/cache@v4
