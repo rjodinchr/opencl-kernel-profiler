@@ -22,7 +22,6 @@
 #include <fstream>
 #include <map>
 #include <mutex>
-#include <perfetto.h>
 #include <queue>
 #include <set>
 #include <stdio.h>
@@ -31,6 +30,12 @@
 #include <thread>
 #ifdef SPIRV_DISASSEMBLY
 #include <spirv-tools/libspirv.hpp>
+#endif
+
+#ifdef CLKP_PERFETTO_AMALGAMATED
+#include "perfetto.h"
+#else
+#include "perfetto/tracing.h"
 #endif
 
 /*****************************************************************************/
