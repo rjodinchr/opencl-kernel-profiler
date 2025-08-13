@@ -70,7 +70,7 @@ static const struct _cl_icd_dispatch *tdispatch;
 #ifdef __ANDROID__
 #define PRINT(message, ...)                                                                                            \
     do {                                                                                                               \
-        __android_log_vprint(                                                                                          \
+        __android_log_print(                                                                                           \
             android_LogPriority::ANDROID_LOG_ERROR, "CLKP", " %s: " message "\n", __func__, ##__VA_ARGS__);            \
     } while (0)
 #else
