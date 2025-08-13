@@ -52,6 +52,10 @@ endif()
 
 target_link_libraries(opencl-kernel-profiler ${PERFETTO_LIBRARY})
 
+if (ANDROID)
+  target_link_libraries(opencl-kernel-profiler log)
+endif()
+
 if (WIN32)
   target_link_libraries(opencl-kernel-profiler ws2_32)
 endif()
@@ -78,6 +82,8 @@ target_compile_options(opencl-kernel-profiler PUBLIC "-DTRACE_MAX_SIZE=${TRACE_M
 
 set(TRACE_DEST "opencl-kernel-profiler.trace" CACHE STRING "Perfetto trace filename")
 target_compile_options(opencl-kernel-profiler PUBLIC "-DTRACE_DEST=\"${TRACE_DEST}\"")
+
+target_compile_options(opencl-kernel-profiler PUBLIC "-DCLKP_PERFETTO_AMALGAMATED")
 
 install(TARGETS opencl-kernel-profiler
         LIBRARY DESTINATION lib

@@ -22,7 +22,6 @@
 #include <fstream>
 #include <map>
 #include <mutex>
-#include <perfetto.h>
 #include <queue>
 #include <set>
 #include <stdio.h>
@@ -31,6 +30,16 @@
 #include <thread>
 #ifdef SPIRV_DISASSEMBLY
 #include <spirv-tools/libspirv.hpp>
+#endif
+
+#ifdef CLKP_PERFETTO_AMALGAMATED
+#include "perfetto.h"
+#else
+#include "perfetto/tracing.h"
+#endif
+
+#ifdef __ANDROID__
+#include <android/log.h>
 #endif
 
 /*****************************************************************************/
@@ -58,10 +67,18 @@ static const struct _cl_icd_dispatch *tdispatch;
 /* MACROS ********************************************************************/
 /*****************************************************************************/
 
+#ifdef __ANDROID__
+#define PRINT(message, ...)                                                                                            \
+    do {                                                                                                               \
+        __android_log_print(                                                                                           \
+            android_LogPriority::ANDROID_LOG_ERROR, "CLKP", " %s: " message "\n", __func__, ##__VA_ARGS__);            \
+    } while (0)
+#else
 #define PRINT(message, ...)                                                                                            \
     do {                                                                                                               \
         fprintf(stderr, "[CLKP] %s: " message "\n", __func__, ##__VA_ARGS__);                                          \
     } while (0)
+#endif
 #define CHECK(test, statement, message, ...)                                                                           \
     do {                                                                                                               \
         if (!(test)) {                                                                                                 \
