@@ -99,8 +99,9 @@ static void writeProgramOnDisk(
     std::filesystem::path filename, cl_uint count, const char **data, const size_t *lengths, bool binary)
 {
     auto dirname = filename.parent_path();
-    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "writeProgramOnDisk", "dir", perfetto::DynamicString(dirname.u8string()),
-        "program", perfetto::DynamicString(filename.filename().u8string()));
+    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "writeProgramOnDisk", "dir",
+        perfetto::DynamicString((const char *)dirname.u8string().c_str()), "program",
+        perfetto::DynamicString((const char *)filename.filename().u8string().c_str()));
     CHECK(std::filesystem::exists(dirname), return;
           , "'%s' does not exist, could not write program on disk", dirname.c_str());
     std::ofstream file(filename, binary ? std::ios::binary | std::ios::trunc : std::ios::trunc);
