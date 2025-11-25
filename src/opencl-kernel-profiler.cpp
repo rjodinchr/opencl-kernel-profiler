@@ -23,7 +23,6 @@
 #include <map>
 #include <mutex>
 #include <queue>
-#include <set>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -158,6 +157,26 @@ static cl_program clkp_clCreateProgramWithSource(
         TRACE_EVENT_INSTANT(CLKP_PERFETTO_CATEGORY, "clCreateProgramWithSource-args", "program",
             perfetto::DynamicString(program_str), "string", perfetto::DynamicString(strings[i]));
     }
+    return program;
+}
+
+static cl_program clkp_clCreateProgramWithBinary(cl_context context, cl_uint num_devices,
+    const cl_device_id *device_list, const size_t *lengths, const unsigned char **binaries, cl_int *binary_status,
+    cl_int *errcode_ret)
+{
+    std::lock_guard<std::mutex> lock(g_lock);
+    std::string program_str = get_program_str();
+    TRACE_EVENT(CLKP_PERFETTO_CATEGORY, "clCreateProgramWithBinary", "program", perfetto::DynamicString(program_str),
+        "num_devices", num_devices);
+    if (auto dir = get_kernel_dir()) {
+        for (unsigned i = 0; i < num_devices; i++) {
+            writeProgramOnDisk(std::filesystem::path(dir) / (program_str + "-" + std::to_string(i) + ".bin"), 1,
+                (const char **)&binaries[i], &lengths[i], true);
+        }
+    }
+    cl_program program = tdispatch->clCreateProgramWithBinary(
+        context, num_devices, device_list, lengths, binaries, binary_status, errcode_ret);
+    program_to_string[program] = program_str;
     return program;
 }
 
@@ -562,6 +581,7 @@ CL_API_ENTRY cl_int CL_API_CALL clInitLayer(cl_uint num_entries, const struct _c
 
     memset(&dispatch, 0, sizeof(dispatch));
     dispatch.clCreateProgramWithSource = clkp_clCreateProgramWithSource;
+    dispatch.clCreateProgramWithBinary = clkp_clCreateProgramWithBinary;
     dispatch.clCreateProgramWithIL = clkp_clCreateProgramWithIL;
     dispatch.clCreateKernel = clkp_clCreateKernel;
     dispatch.clEnqueueNDRangeKernel = clkp_clEnqueueNDRangeKernel;
