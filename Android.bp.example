@@ -32,3 +32,18 @@ cc_library_shared {
     header_libs: ["OpenCL-Headers"],
     soc_specific: true,
 }
+
+cc_genrule {
+    name: "opencl-kernel-profiler-path",
+    out: ["opencl-kernel-profiler.lay"],
+    cmd: "echo /vendor/$$CC_MULTILIB/opencl-kernel-profiler.so > $(out)",
+    soc_specific: true,
+}
+
+prebuilt_etc {
+    name: "opencl-kernel-profiler_prebuilt",
+    src: ":opencl-kernel-profiler-path",
+    filename_from_src: true,
+    relative_install_path: "Khronos/OpenCL/layers",
+    soc_specific: true,
+}

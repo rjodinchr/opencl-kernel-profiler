@@ -57,6 +57,21 @@ Make sure to have emerged and deployed the `opencl-icd-loader` as well as the `o
 
 Then run the application using `opencl-kernel-profiler.sh`. This script will take care of setting all the environment variables needed to run with the `opencl-kernel-profiler`.
 
+## On Android
+
+* Clone the project under `<aosp>/external/opencl-kernel-profiler`
+* Compile the project through Soong (Android build system):
+```
+<aosp> $ mmm external/opencl-kernel-profiler
+```
+* Copy the library as well as the `.lay` file:
+```
+<aosp> $ adb push $OUT/vendor/lib64/opencl-kernel-profiler.so /vendor/lib64/
+<aosp> $ adb push $OUT/vendor/etc/Khronos/OpenCL/layers/opencl-kernel-profiler.lay /vendor/etc/Khronos/OpenCL/layers/
+```
+
+Any application using the `OpenCL-ICD-Loader` will go through the `opencl-kernel-profiler`.
+
 # Using the trace
 
 Once traces have been generated, on can view them using the [perfetto trace viewer](https://ui.perfetto.dev).
