@@ -6,6 +6,8 @@
 
 `opencl-kernel-profiler` is licensed under the terms of the [Apache 2.0 license](LICENSE).
 
+This is not an officially supported Google product. This project is not eligible for the [Google Open Source Software Vulnerability Rewards Program](https://bughunters.google.com/open-source-security).
+
 # Dependencies
 
 `opencl-kernel-profiler` depends on the following:
