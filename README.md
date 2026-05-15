@@ -1,3 +1,16 @@
+# Repository Migration Notice
+**This repository was archived on Mai 15, 2026. It is now read-only.**
+
+The project has been migrated to the Google Open Source organization. Please find the active codebase, issues, and future releases at the new canonical home:
+
+### [google/opencl-kernel-profiler](https://github.com/google/opencl-kernel-profiler)
+
+---
+*If you have a local clone of this repository, you can update your remote to point to the new location:*
+```bash
+git remote set-url origin https://github.com/google/opencl-kernel-profiler.git
+```
+
 # OpenCL Kernel Profiler
 
 `opencl-kernel-profiler` is a perfetto-based OpenCL kernel profiler using the layering capability of the [OpenCL-ICD-Loader](https://github.com/KhronosGroup/OpenCL-ICD-Loader#about-layers)
